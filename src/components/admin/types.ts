@@ -33,7 +33,9 @@ export type AdminProject = {
   tagline: string | null;
   logline: string | null;
   posterKey: string | null;
-  accentColor: string;
+  logoKey: string | null;
+  themeId: string;
+  accentColor: string | null;
   isPublished: boolean;
   aboutContent: string | null;
   aboutTeam: TeamMember[] | null;

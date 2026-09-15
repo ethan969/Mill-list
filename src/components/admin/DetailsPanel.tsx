@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { inputClass, Field, slugify } from "@/components/admin/FormField";
 import type { AdminProject } from "@/components/admin/types";
+import { THEMES, getTheme } from "@/lib/themes";
 
 export default function DetailsPanel({
   project,
@@ -17,7 +18,6 @@ export default function DetailsPanel({
     productionCompany: project.productionCompany,
     tagline: project.tagline ?? "",
     logline: project.logline ?? "",
-    accentColor: project.accentColor,
   });
   const [newPassword, setNewPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -25,6 +25,11 @@ export default function DetailsPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [posterUploading, setPosterUploading] = useState(false);
   const [posterVersion, setPosterVersion] = useState(0);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoVersion, setLogoVersion] = useState(0);
+
+  const theme = getTheme(project.themeId);
+  const currentAccent = project.accentColor || theme.colors.accent;
 
   async function save(extra: Record<string, unknown> = {}) {
     setSaving(true);
@@ -72,6 +77,30 @@ export default function DetailsPanel({
       setError("Network error.");
     } finally {
       setPosterUploading(false);
+    }
+  }
+
+  async function handleLogoUpload(file: File) {
+    setLogoUploading(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch(`/api/admin/projects/${project.id}/logo`, {
+        method: "POST",
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Couldn't upload logo.");
+        return;
+      }
+      onUpdate(data.project);
+      setLogoVersion((v) => v + 1);
+    } catch {
+      setError("Network error.");
+    } finally {
+      setLogoUploading(false);
     }
   }
 
@@ -144,19 +173,84 @@ export default function DetailsPanel({
           />
         </Field>
 
-        <Field label="Accent color">
-          <input
-            type="color"
-            className="h-10 w-16 rounded border border-border bg-surface"
-            value={form.accentColor}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, accentColor: e.target.value }))
-            }
-          />
-        </Field>
-
         {error && <p className="text-xs text-danger">{error}</p>}
         {message && <p className="text-xs text-accent">{message}</p>}
+      </section>
+
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
+          Visual theme
+        </h2>
+        <p className="text-xs text-muted">
+          Pick the palette and titling font that fits this film. Applies
+          instantly to the landing page and data room.
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {THEMES.map((t) => {
+            const active = t.id === project.themeId;
+            return (
+              <button
+                key={t.id}
+                onClick={() => save({ themeId: t.id })}
+                disabled={saving}
+                className={`flex flex-col gap-2 rounded-md border p-3 text-left transition-colors ${
+                  active
+                    ? "border-accent"
+                    : "border-border hover:border-muted"
+                }`}
+                style={{ background: t.colors.background }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="h-4 w-4 rounded-full border border-white/10"
+                    style={{ background: t.colors.accent }}
+                  />
+                  <span
+                    className="font-display text-sm"
+                    style={{ color: t.colors.foreground }}
+                  >
+                    Aa
+                  </span>
+                </div>
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: t.colors.foreground }}
+                >
+                  {t.label}
+                </span>
+                <span
+                  className="text-[10px] leading-snug"
+                  style={{ color: t.colors.muted }}
+                >
+                  {t.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-2 flex items-center gap-3">
+          <label className="text-xs text-muted">Accent override</label>
+          <input
+            key={`${project.themeId}:${project.accentColor ?? ""}`}
+            type="color"
+            className="h-8 w-12 rounded border border-border bg-surface"
+            defaultValue={currentAccent}
+            onBlur={(e) => {
+              if (e.target.value !== currentAccent) {
+                save({ accentColor: e.target.value });
+              }
+            }}
+          />
+          {project.accentColor && (
+            <button
+              onClick={() => save({ accentColor: "" })}
+              className="text-xs text-muted hover:text-accent transition-colors"
+            >
+              Reset to theme default
+            </button>
+          )}
+        </div>
       </section>
 
       <section className="flex flex-col gap-3 border-t border-border pt-6">
@@ -203,6 +297,36 @@ export default function DetailsPanel({
             Update
           </button>
         </div>
+      </section>
+
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
+          Logo
+        </h2>
+        <p className="text-xs text-muted">
+          Shown instead of the production company name, on the landing page
+          and in the room header. PNG, WebP or SVG, ideally transparent.
+        </p>
+        {project.logoKey && (
+          <div className="flex h-16 w-40 items-center justify-center overflow-hidden rounded-md border border-border bg-surface p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/projects/${project.slug}/logo?v=${logoVersion}`}
+              alt=""
+              className="h-full w-full object-contain"
+            />
+          </div>
+        )}
+        <input
+          type="file"
+          accept="image/png,image/webp,image/svg+xml"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleLogoUpload(file);
+          }}
+          disabled={logoUploading}
+          className="text-xs text-muted"
+        />
       </section>
 
       <section className="flex flex-col gap-3 border-t border-border pt-6">

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { getRoomSession } from "@/lib/auth";
 import PasswordGateForm from "@/components/PasswordGateForm";
+import ThemeWrapper from "@/components/ThemeWrapper";
 
 export async function generateMetadata({
   params,
@@ -36,6 +37,9 @@ export default async function ProjectLandingPage({
       productionCompany: true,
       tagline: true,
       posterKey: true,
+      logoKey: true,
+      themeId: true,
+      accentColor: true,
       isPublished: true,
     },
   });
@@ -48,7 +52,11 @@ export default async function ProjectLandingPage({
   }
 
   return (
-    <div className="relative flex flex-1 flex-col">
+    <ThemeWrapper
+      themeId={project.themeId}
+      accentColor={project.accentColor}
+      className="relative flex flex-1 flex-col"
+    >
       {project.posterKey && (
         <div className="absolute inset-0 -z-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -62,9 +70,20 @@ export default async function ProjectLandingPage({
       )}
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
-        <p className="animate-fade-up font-display text-sm tracking-[0.35em] text-muted uppercase">
-          {project.productionCompany}
-        </p>
+        {project.logoKey ? (
+          <div className="animate-fade-up mb-6 h-14">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/projects/${slug}/logo`}
+              alt={project.productionCompany}
+              className="h-full w-auto object-contain"
+            />
+          </div>
+        ) : (
+          <p className="animate-fade-up font-display text-sm tracking-[0.35em] text-muted uppercase">
+            {project.productionCompany}
+          </p>
+        )}
         <h1 className="animate-fade-up mt-5 max-w-3xl text-balance font-display text-5xl font-medium leading-tight sm:text-7xl">
           {project.title}
         </h1>
@@ -91,6 +110,6 @@ export default async function ProjectLandingPage({
       <footer className="pb-8 text-center text-[11px] text-muted/60">
         For authorized recipients only. Materials are confidential.
       </footer>
-    </div>
+    </ThemeWrapper>
   );
 }

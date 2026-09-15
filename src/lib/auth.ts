@@ -14,6 +14,7 @@ const secret = new TextEncoder().encode(secretValue);
 const ADMIN_COOKIE = "admin_session";
 const ADMIN_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 const ROOM_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const DOWNLOAD_LINK_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 function roomCookieName(slug: string) {
   return `room_${slug}`;
@@ -42,8 +43,15 @@ type RoomSessionPayload = {
   slug: string;
 };
 
+type DownloadLinkPayload = {
+  kind: "download";
+  downloadId: string;
+  documentId: string;
+  email: string;
+};
+
 async function sign(
-  payload: AdminSessionPayload | RoomSessionPayload,
+  payload: AdminSessionPayload | RoomSessionPayload | DownloadLinkPayload,
   ttlSeconds: number
 ): Promise<string> {
   return new SignJWT({ ...payload })
@@ -138,4 +146,27 @@ export async function verifyRoomAccessForProject(
 ): Promise<boolean> {
   const session = await getRoomSession(slug);
   return Boolean(session && session.projectId === projectId);
+}
+
+// ---- Emailed download links ----
+// A watermarked-download request doesn't hand the file to the browser that
+// asked for it — it emails a signed link to the address the visitor typed,
+// which may be opened on a different device with no room session cookie at
+// all. The token below is the download's only credential, so it carries
+// everything needed to authorize and watermark that one file.
+
+export async function createDownloadToken(payload: {
+  downloadId: string;
+  documentId: string;
+  email: string;
+}): Promise<string> {
+  return sign({ kind: "download", ...payload }, DOWNLOAD_LINK_TTL_SECONDS);
+}
+
+export async function verifyDownloadToken(
+  token: string
+): Promise<DownloadLinkPayload | null> {
+  const payload = await verify<DownloadLinkPayload>(token);
+  if (!payload || payload.kind !== "download") return null;
+  return payload;
 }

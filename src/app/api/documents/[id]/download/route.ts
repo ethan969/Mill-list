@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyRoomAccessForProject } from "@/lib/auth";
-import { getObjectBuffer } from "@/lib/storage";
-import { watermarkPdf } from "@/lib/watermark";
+import { verifyRoomAccessForProject, createDownloadToken } from "@/lib/auth";
 import { recordDownload, clientIp } from "@/lib/leads";
+import { sendDownloadLinkEmail } from "@/lib/email";
 import { emailSchema } from "@/lib/validation";
 import { checkRateLimit, recordAttempt } from "@/lib/rate-limit";
+import { getTheme } from "@/lib/themes";
+
+const APP_URL = process.env.APP_URL;
 
 export async function POST(
   request: NextRequest,
@@ -18,9 +20,17 @@ export async function POST(
     select: {
       id: true,
       title: true,
-      fileKey: true,
       mimeType: true,
-      project: { select: { id: true, slug: true, title: true } },
+      project: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          productionCompany: true,
+          themeId: true,
+          accentColor: true,
+        },
+      },
     },
   });
 
@@ -70,26 +80,47 @@ export async function POST(
     );
   }
 
-  const original = await getObjectBuffer(document.fileKey);
-  const watermarked = await watermarkPdf(original, {
-    email,
-    projectTitle: document.project.title,
-  });
-
-  await recordDownload({
+  const download = await recordDownload({
     projectId: document.project.id,
     documentId: document.id,
     email,
     request,
   });
 
-  const safeTitle = document.title.replace(/[^a-z0-9-_ ]/gi, "").trim() || "document";
-
-  return new NextResponse(Buffer.from(watermarked), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${safeTitle} (watermarked).pdf"`,
-      "Cache-Control": "private, no-store",
-    },
+  const token = await createDownloadToken({
+    downloadId: download.id,
+    documentId: document.id,
+    email,
   });
+
+  const origin = APP_URL || request.nextUrl.origin;
+  const downloadUrl = `${origin}/api/documents/${document.id}/download/link?token=${encodeURIComponent(token)}`;
+
+  const theme = getTheme(document.project.themeId);
+  const accentColor = document.project.accentColor || theme.colors.accent;
+
+  try {
+    const result = await sendDownloadLinkEmail({
+      to: email,
+      projectTitle: document.project.title,
+      productionCompany: document.project.productionCompany,
+      documentTitle: document.title,
+      downloadUrl,
+      accentColor,
+    });
+    if (result.delivered) {
+      await prisma.documentDownload.update({
+        where: { id: download.id },
+        data: { emailSent: true },
+      });
+    }
+  } catch (err) {
+    console.error("Failed to send download email:", err);
+    return NextResponse.json(
+      { error: "Couldn't send the email. Try again shortly." },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json({ ok: true });
 }

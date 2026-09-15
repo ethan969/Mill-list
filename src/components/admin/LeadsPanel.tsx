@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 type Download = {
   id: string;
   email: string;
+  emailSent: boolean;
+  linkOpened: boolean;
   createdAt: string;
   document: { title: string; section: string };
 };
@@ -21,11 +23,13 @@ export default function LeadsPanel({ projectId }: { projectId: string }) {
   function exportCsv() {
     if (!downloads) return;
     const rows = [
-      ["Email", "Document", "Section", "Date"],
+      ["Email", "Document", "Section", "Email sent", "Link opened", "Date"],
       ...downloads.map((d) => [
         d.email,
         d.document.title,
         d.document.section,
+        d.emailSent ? "yes" : "no",
+        d.linkOpened ? "yes" : "no",
         new Date(d.createdAt).toISOString(),
       ]),
     ];
@@ -54,8 +58,7 @@ export default function LeadsPanel({ projectId }: { projectId: string }) {
         </button>
       </div>
       <p className="mt-1 text-sm text-muted">
-        Everyone who has entered their email to download a watermarked
-        document.
+        Everyone who has requested a watermarked document by email.
       </p>
 
       {downloads === null ? (
@@ -69,6 +72,7 @@ export default function LeadsPanel({ projectId }: { projectId: string }) {
               <tr>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Document</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Date</th>
               </tr>
             </thead>
@@ -77,6 +81,13 @@ export default function LeadsPanel({ projectId }: { projectId: string }) {
                 <tr key={d.id}>
                   <td className="px-4 py-3">{d.email}</td>
                   <td className="px-4 py-3">{d.document.title}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {!d.emailSent
+                      ? "Failed to send"
+                      : d.linkOpened
+                        ? "Opened"
+                        : "Sent"}
+                  </td>
                   <td className="px-4 py-3 text-muted">
                     {new Date(d.createdAt).toLocaleString()}
                   </td>

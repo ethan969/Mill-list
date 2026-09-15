@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { THEMES } from "@/lib/themes";
+
+const THEME_IDS = THEMES.map((t) => t.id);
 
 export const emailSchema = z
   .string()
@@ -26,11 +29,16 @@ export const projectCreateSchema = z.object({
   productionCompany: z.string().trim().min(1).max(200),
   tagline: z.string().trim().max(300).optional().or(z.literal("")),
   logline: z.string().trim().max(1000).optional().or(z.literal("")),
+  themeId: z
+    .string()
+    .refine((v) => THEME_IDS.includes(v), "Unknown theme")
+    .optional(),
   accentColor: z
     .string()
     .trim()
     .regex(/^#[0-9a-fA-F]{6}$/)
-    .optional(),
+    .optional()
+    .or(z.literal("")),
   password: roomPasswordSchema,
 });
 

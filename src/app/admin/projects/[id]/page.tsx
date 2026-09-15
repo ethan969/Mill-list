@@ -30,6 +30,8 @@ export default async function ProjectEditPage({
     tagline: project.tagline,
     logline: project.logline,
     posterKey: project.posterKey,
+    logoKey: project.logoKey,
+    themeId: project.themeId,
     accentColor: project.accentColor,
     isPublished: project.isPublished,
     aboutContent: project.aboutContent,

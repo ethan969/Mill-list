@@ -36,7 +36,10 @@ model Project {
   logline           String?
   posterKey         String?
   posterMimeType    String?
-  accentColor       String   @default("#C9A24B")
+  logoKey           String?
+  logoMimeType      String?
+  themeId           String   @default("midnight-gold")
+  accentColor       String?
   passwordHash      String
   isPublished       Boolean  @default(false)
   aboutContent      String?
@@ -99,8 +102,8 @@ model ReferenceLink {
   @@index([projectId])
 }
 
-/// Recorded each time someone provides their email to download a
-/// watermarked copy of a document from the data room.
+/// Recorded each time someone provides their email to receive a
+/// watermarked copy of a document from the data room by email.
 model DocumentDownload {
   id         String   @id @default(cuid())
   projectId  String
@@ -108,6 +111,8 @@ model DocumentDownload {
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   email      String
+  emailSent  Boolean  @default(false)
+  linkOpened Boolean  @default(false)
   ip         String?
   userAgent  String?
   createdAt  DateTime @default(now())

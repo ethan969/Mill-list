@@ -14,7 +14,7 @@ export async function recordDownload(params: {
   email: string;
   request: NextRequest;
 }) {
-  await prisma.documentDownload.create({
+  return prisma.documentDownload.create({
     data: {
       projectId: params.projectId,
       documentId: params.documentId,

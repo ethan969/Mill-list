@@ -7,9 +7,11 @@ import { ROOM_NAV } from "@/lib/sections";
 export default function RoomNav({
   slug,
   title,
+  logoUrl,
 }: {
   slug: string;
   title: string;
+  logoUrl?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -24,7 +26,12 @@ export default function RoomNav({
     <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 sm:px-8">
         <div className="flex items-center justify-between">
-          <p className="font-display text-lg tracking-wide">{title}</p>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={title} className="h-7 w-auto object-contain" />
+          ) : (
+            <p className="font-display text-lg tracking-wide">{title}</p>
+          )}
           <button
             onClick={handleExit}
             className="text-[11px] uppercase tracking-widest text-muted hover:text-accent transition-colors"

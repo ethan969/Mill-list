@@ -70,7 +70,10 @@ export async function PATCH(
         : {}),
       ...(data.tagline !== undefined ? { tagline: data.tagline || null } : {}),
       ...(data.logline !== undefined ? { logline: data.logline || null } : {}),
-      ...(data.accentColor ? { accentColor: data.accentColor } : {}),
+      ...(data.themeId ? { themeId: data.themeId } : {}),
+      ...(data.accentColor !== undefined
+        ? { accentColor: data.accentColor || null }
+        : {}),
       ...(data.isPublished !== undefined
         ? { isPublished: data.isPublished }
         : {}),
@@ -107,6 +110,7 @@ export async function DELETE(
     ...project.documents.map((d) => d.fileKey),
     ...project.gallery.map((g) => g.fileKey),
     ...(project.posterKey ? [project.posterKey] : []),
+    ...(project.logoKey ? [project.logoKey] : []),
   ];
   await Promise.allSettled(keys.map((key) => deleteObject(key)));
 

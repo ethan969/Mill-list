@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getRoomSession } from "@/lib/auth";
 import RoomNav from "@/components/RoomNav";
+import ThemeWrapper from "@/components/ThemeWrapper";
 
 export default async function RoomLayout({
   params,
@@ -11,7 +12,14 @@ export default async function RoomLayout({
 
   const project = await prisma.project.findUnique({
     where: { slug },
-    select: { id: true, title: true, isPublished: true, accentColor: true },
+    select: {
+      id: true,
+      title: true,
+      isPublished: true,
+      themeId: true,
+      accentColor: true,
+      logoKey: true,
+    },
   });
 
   if (!project || !project.isPublished) notFound();
@@ -22,14 +30,19 @@ export default async function RoomLayout({
   }
 
   return (
-    <div
+    <ThemeWrapper
+      themeId={project.themeId}
+      accentColor={project.accentColor}
       className="flex flex-1 flex-col"
-      style={{ "--color-accent": project.accentColor } as React.CSSProperties}
     >
-      <RoomNav slug={slug} title={project.title} />
+      <RoomNav
+        slug={slug}
+        title={project.title}
+        logoUrl={project.logoKey ? `/api/projects/${slug}/logo` : null}
+      />
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:px-8">
         {children}
       </main>
-    </div>
+    </ThemeWrapper>
   );
 }
