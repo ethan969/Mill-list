@@ -33,6 +33,9 @@ export default async function ProjectEditPage({
     logoKey: project.logoKey,
     themeId: project.themeId,
     accentColor: project.accentColor,
+    fontId: project.fontId,
+    landingLayout: project.landingLayout,
+    roomLayout: project.roomLayout,
     isPublished: project.isPublished,
     aboutContent: project.aboutContent,
     aboutTeam: Array.isArray(project.aboutTeam)

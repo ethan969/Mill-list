@@ -120,6 +120,61 @@ export function getTheme(id: string | null | undefined): Theme {
   return THEMES.find((t) => t.id === id) ?? THEMES[0]!;
 }
 
+export type FontOption = {
+  id: string;
+  label: string;
+  description: string;
+  fontVar: string; // matches a --font-* variable loaded in src/app/layout.tsx
+};
+
+/**
+ * The titling fonts available independently of theme. Each theme suggests
+ * one of these as its default (Theme.fontVar), but a project can pick any
+ * of them regardless of which color theme it uses.
+ */
+export const FONTS: FontOption[] = [
+  {
+    id: "cormorant",
+    label: "Cormorant Garamond",
+    description: "Elegant, high-contrast serif",
+    fontVar: "--font-cormorant",
+  },
+  {
+    id: "playfair",
+    label: "Playfair Display",
+    description: "Dramatic, editorial serif",
+    fontVar: "--font-playfair",
+  },
+  {
+    id: "space-grotesk",
+    label: "Space Grotesk",
+    description: "Modern, geometric sans",
+    fontVar: "--font-space-grotesk",
+  },
+  {
+    id: "libre-baskerville",
+    label: "Libre Baskerville",
+    description: "Classic book serif",
+    fontVar: "--font-libre-baskerville",
+  },
+  {
+    id: "dm-serif",
+    label: "DM Serif Display",
+    description: "Warm, soft serif",
+    fontVar: "--font-dm-serif",
+  },
+  {
+    id: "bebas",
+    label: "Bebas Neue",
+    description: "Bold, condensed titling caps",
+    fontVar: "--font-bebas",
+  },
+];
+
+export function getFont(id: string | null | undefined): FontOption | null {
+  return FONTS.find((f) => f.id === id) ?? null;
+}
+
 /** Picks readable black/white text for an arbitrary hex background color. */
 function readableForeground(hex: string): string {
   const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
@@ -132,16 +187,22 @@ function readableForeground(hex: string): string {
   return luminance > 0.6 ? "#14120a" : "#fbf9f3";
 }
 
-/** CSS custom properties for a project's chosen theme, with an optional accent override. */
+/**
+ * CSS custom properties for a project's chosen theme, with an optional
+ * accent-color override and an optional font override (independent of the
+ * theme's own suggested font).
+ */
 export function themeStyleVars(
   themeId: string | null | undefined,
-  accentOverride?: string | null
+  accentOverride?: string | null,
+  fontIdOverride?: string | null
 ): Record<string, string> {
   const theme = getTheme(themeId);
   const accent = accentOverride || theme.colors.accent;
   const accentForeground = accentOverride
     ? readableForeground(accentOverride)
     : theme.colors.accentForeground;
+  const fontVar = getFont(fontIdOverride)?.fontVar ?? theme.fontVar;
   return {
     "--color-background": theme.colors.background,
     "--color-surface": theme.colors.surface,
@@ -151,6 +212,6 @@ export function themeStyleVars(
     "--color-muted": theme.colors.muted,
     "--color-accent": accent,
     "--color-accent-foreground": accentForeground,
-    "--font-display": `var(${theme.fontVar})`,
+    "--font-display": `var(${fontVar})`,
   };
 }

@@ -74,6 +74,9 @@ export async function PATCH(
       ...(data.accentColor !== undefined
         ? { accentColor: data.accentColor || null }
         : {}),
+      ...(data.fontId !== undefined ? { fontId: data.fontId || null } : {}),
+      ...(data.landingLayout ? { landingLayout: data.landingLayout } : {}),
+      ...(data.roomLayout ? { roomLayout: data.roomLayout } : {}),
       ...(data.isPublished !== undefined
         ? { isPublished: data.isPublished }
         : {}),

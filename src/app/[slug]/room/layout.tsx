@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getRoomSession } from "@/lib/auth";
 import RoomNav from "@/components/RoomNav";
+import RoomSidebar from "@/components/RoomSidebar";
 import ThemeWrapper from "@/components/ThemeWrapper";
 
 export default async function RoomLayout({
@@ -18,6 +19,8 @@ export default async function RoomLayout({
       isPublished: true,
       themeId: true,
       accentColor: true,
+      fontId: true,
+      roomLayout: true,
       logoKey: true,
     },
   });
@@ -29,17 +32,32 @@ export default async function RoomLayout({
     redirect(`/${slug}`);
   }
 
+  const logoUrl = project.logoKey ? `/api/projects/${slug}/logo` : null;
+
+  if (project.roomLayout === "sidebar") {
+    return (
+      <ThemeWrapper
+        themeId={project.themeId}
+        accentColor={project.accentColor}
+        fontId={project.fontId}
+        className="flex flex-1"
+      >
+        <RoomSidebar slug={slug} title={project.title} logoUrl={logoUrl} />
+        <main className="w-full max-w-4xl flex-1 px-5 py-10 sm:px-10">
+          {children}
+        </main>
+      </ThemeWrapper>
+    );
+  }
+
   return (
     <ThemeWrapper
       themeId={project.themeId}
       accentColor={project.accentColor}
+      fontId={project.fontId}
       className="flex flex-1 flex-col"
     >
-      <RoomNav
-        slug={slug}
-        title={project.title}
-        logoUrl={project.logoKey ? `/api/projects/${slug}/logo` : null}
-      />
+      <RoomNav slug={slug} title={project.title} logoUrl={logoUrl} />
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:px-8">
         {children}
       </main>

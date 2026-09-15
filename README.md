@@ -21,12 +21,13 @@ unlimited projects, each with its own URL, password and branding.
   is also what makes the watermark meaningful. Every request is logged as a
   lead, and the Leads tab shows whether the email actually sent and whether
   the link was opened.
-- **Adaptable visual language per project** — six curated themes (palette +
-  titling font, tuned for different genres — e.g. an elegant gold/serif look
-  for a prestige drama vs. a red/serif horror look vs. a cyan/geometric
-  sci-fi look), an optional accent-color override, and a logo upload that
-  replaces the plain production-company text on the landing page and in the
-  room header. Pick a theme in the admin panel and it applies instantly.
+- **Adaptable visual language per project** — six curated color themes tuned
+  for different genres, six titling fonts pickable independently of theme,
+  an accent-color override, three landing-page layouts (centered wordmark,
+  split poster, full-bleed one-sheet) and two room layouts (top tabs or a
+  sidebar file-browser), plus a logo upload that replaces the plain
+  production-company text. Every combination applies instantly from the
+  admin panel.
 - **Admin panel** (`/admin`) — create a project, upload documents per
   section, manage the gallery and reference links, write the About Us copy,
   set the theme/logo/poster/password, publish/unpublish, and export the lead
@@ -93,9 +94,10 @@ touch:
 2. Go through the tabs: upload the **Script**, **Creative Deck**,
    **Financials** and **Production Plan** PDFs, write **About Us**, add
    **Gallery** stills/video and **Reference** links.
-3. On the **Details** tab, pick a **visual theme** that fits the film (see
-   below), optionally override the accent color, and upload a **logo** and
-   landing-page **poster**.
+3. On the **Details** tab, pick a **visual theme** and **titling font** that
+   fit the film (see below), optionally override the accent color, choose a
+   **landing page layout** and **data room navigation** style, and upload a
+   **logo** and landing-page **poster**.
 4. Flip **Publish** on. Share `yourdomain.com/<slug>` and the password with
    whoever needs access.
 5. Check the **Leads** tab any time to see who's requested what, and whether
@@ -122,6 +124,35 @@ An optional accent-color override sits on top of whichever theme you pick,
 for when you want the palette but a different brand color. Add a seventh
 theme by editing `src/lib/themes.ts` (colors) and, if it needs a new font,
 loading it once in `src/app/layout.tsx` the same way the existing six are.
+
+### Fonts, independently of theme
+
+Each theme suggests a titling font, but the **Titling font** picker on the
+Details tab can override it with any of the same six fonts regardless of
+which color theme is active — e.g. Blood Moon's palette with Bebas Neue's
+condensed caps instead of its default Playfair Display. The font applies to
+the film title and every section heading, in both the landing page and the
+room, via a single `--font-display` CSS variable
+(`src/lib/themes.ts#themeStyleVars`). Adding an eighth font means loading it
+once in `src/app/layout.tsx` and adding an entry to `FONTS` in
+`src/lib/themes.ts`.
+
+### Layouts
+
+Two independent layout choices, each a small, deliberate set rather than a
+drag-and-drop builder:
+
+- **Landing page** (`src/components/landing/`) — **Centered** (a wordmark
+  title over faint poster art), **Split** (poster fills one half of the
+  screen, title and password form the other), or **Full Bleed** (poster
+  fills the whole screen like a one-sheet, title anchored over the bottom
+  with a strong gradient).
+- **Data room navigation** (`RoomNav` / `RoomSidebar`) — **Top Nav** (section
+  tabs across the top, the original pitch-deck feel) or **Sidebar** (a
+  vertical section list down the left, closer to a document-library feel).
+
+Both switch instantly from the admin panel and combine freely with any
+theme/font/accent choice.
 
 ## How access control works
 

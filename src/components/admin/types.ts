@@ -36,6 +36,9 @@ export type AdminProject = {
   logoKey: string | null;
   themeId: string;
   accentColor: string | null;
+  fontId: string | null;
+  landingLayout: string;
+  roomLayout: string;
   isPublished: boolean;
   aboutContent: string | null;
   aboutTeam: TeamMember[] | null;

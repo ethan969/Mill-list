@@ -40,6 +40,9 @@ model Project {
   logoMimeType      String?
   themeId           String   @default("midnight-gold")
   accentColor       String?
+  fontId            String?
+  landingLayout     String   @default("centered")
+  roomLayout        String   @default("top-nav")
   passwordHash      String
   isPublished       Boolean  @default(false)
   aboutContent      String?

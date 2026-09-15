@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { inputClass, Field, slugify } from "@/components/admin/FormField";
 import type { AdminProject } from "@/components/admin/types";
-import { THEMES, getTheme } from "@/lib/themes";
+import { THEMES, FONTS, getTheme } from "@/lib/themes";
+import { LANDING_LAYOUTS, ROOM_LAYOUTS } from "@/lib/layouts";
 
 export default function DetailsPanel({
   project,
@@ -255,6 +256,103 @@ export default function DetailsPanel({
 
       <section className="flex flex-col gap-3 border-t border-border pt-6">
         <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
+          Titling font
+        </h2>
+        <p className="text-xs text-muted">
+          Overrides the theme&apos;s suggested font. Used for the film title
+          and section headings throughout.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => save({ fontId: "" })}
+            disabled={saving}
+            className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+              !project.fontId
+                ? "border-accent text-accent"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            Theme default ({theme.label})
+          </button>
+          {FONTS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => save({ fontId: f.id })}
+              disabled={saving}
+              style={{ fontFamily: `var(${f.fontVar})` }}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                project.fontId === f.id
+                  ? "border-accent text-accent"
+                  : "border-border text-foreground hover:border-muted"
+              }`}
+              title={f.description}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
+          Landing page layout
+        </h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {LANDING_LAYOUTS.map((l) => {
+            const active = l.id === project.landingLayout;
+            return (
+              <button
+                key={l.id}
+                onClick={() => save({ landingLayout: l.id })}
+                disabled={saving}
+                className={`flex flex-col gap-2 rounded-md border p-3 text-left transition-colors ${
+                  active
+                    ? "border-accent bg-surface"
+                    : "border-border bg-surface hover:border-muted"
+                }`}
+              >
+                <LayoutIcon variant={l.id} />
+                <span className="text-xs font-medium">{l.label}</span>
+                <span className="text-[10px] leading-snug text-muted">
+                  {l.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
+          Data room navigation
+        </h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {ROOM_LAYOUTS.map((l) => {
+            const active = l.id === project.roomLayout;
+            return (
+              <button
+                key={l.id}
+                onClick={() => save({ roomLayout: l.id })}
+                disabled={saving}
+                className={`flex flex-col gap-2 rounded-md border p-3 text-left transition-colors ${
+                  active
+                    ? "border-accent bg-surface"
+                    : "border-border bg-surface hover:border-muted"
+                }`}
+              >
+                <RoomLayoutIcon variant={l.id} />
+                <span className="text-xs font-medium">{l.label}</span>
+                <span className="text-[10px] leading-snug text-muted">
+                  {l.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
           Publish
         </h2>
         <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
@@ -354,6 +452,61 @@ export default function DetailsPanel({
           className="text-xs text-muted"
         />
       </section>
+    </div>
+  );
+}
+
+function LayoutIcon({ variant }: { variant: string }) {
+  const box = "rounded-sm bg-muted/30";
+  if (variant === "split") {
+    return (
+      <div className="flex h-10 w-full gap-0.5 overflow-hidden rounded border border-border">
+        <div className={`${box} w-1/2`} />
+        <div className="flex w-1/2 flex-col items-center justify-center gap-0.5">
+          <div className="h-1 w-6 rounded-full bg-muted/50" />
+          <div className="h-1 w-4 rounded-full bg-muted/30" />
+        </div>
+      </div>
+    );
+  }
+  if (variant === "full-bleed") {
+    return (
+      <div className={`relative h-10 w-full overflow-hidden rounded border border-border ${box}`}>
+        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-0.5 bg-black/30 py-1">
+          <div className="h-1 w-8 rounded-full bg-muted/60" />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-10 w-full flex-col items-center justify-center gap-0.5 rounded border border-border">
+      <div className="h-1 w-8 rounded-full bg-muted/50" />
+      <div className="h-1 w-5 rounded-full bg-muted/30" />
+    </div>
+  );
+}
+
+function RoomLayoutIcon({ variant }: { variant: string }) {
+  if (variant === "sidebar") {
+    return (
+      <div className="flex h-10 w-full gap-0.5 overflow-hidden rounded border border-border">
+        <div className="flex w-1/3 flex-col gap-0.5 bg-muted/20 p-1">
+          <div className="h-0.5 w-full rounded-full bg-muted/60" />
+          <div className="h-0.5 w-full rounded-full bg-muted/30" />
+          <div className="h-0.5 w-full rounded-full bg-muted/30" />
+        </div>
+        <div className="flex-1 bg-muted/10" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-10 w-full flex-col gap-0.5 overflow-hidden rounded border border-border">
+      <div className="flex gap-1 bg-muted/20 p-1">
+        <div className="h-0.5 w-4 rounded-full bg-muted/60" />
+        <div className="h-0.5 w-4 rounded-full bg-muted/30" />
+        <div className="h-0.5 w-4 rounded-full bg-muted/30" />
+      </div>
+      <div className="flex-1 bg-muted/10" />
     </div>
   );
 }

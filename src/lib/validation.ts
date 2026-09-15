@@ -1,7 +1,11 @@
 import { z } from "zod";
-import { THEMES } from "@/lib/themes";
+import { THEMES, FONTS } from "@/lib/themes";
+import { LANDING_LAYOUTS, ROOM_LAYOUTS } from "@/lib/layouts";
 
 const THEME_IDS = THEMES.map((t) => t.id);
+const FONT_IDS = FONTS.map((f) => f.id);
+const LANDING_LAYOUT_IDS: string[] = LANDING_LAYOUTS.map((l) => l.id);
+const ROOM_LAYOUT_IDS: string[] = ROOM_LAYOUTS.map((l) => l.id);
 
 export const emailSchema = z
   .string()
@@ -32,6 +36,19 @@ export const projectCreateSchema = z.object({
   themeId: z
     .string()
     .refine((v) => THEME_IDS.includes(v), "Unknown theme")
+    .optional(),
+  fontId: z
+    .string()
+    .refine((v) => FONT_IDS.includes(v), "Unknown font")
+    .optional()
+    .or(z.literal("")),
+  landingLayout: z
+    .string()
+    .refine((v) => LANDING_LAYOUT_IDS.includes(v), "Unknown landing layout")
+    .optional(),
+  roomLayout: z
+    .string()
+    .refine((v) => ROOM_LAYOUT_IDS.includes(v), "Unknown room layout")
     .optional(),
   accentColor: z
     .string()
