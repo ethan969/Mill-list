@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b0b0c;
+  --surface: #141416;
+  --surface-raised: #1c1c1f;
+  --border: #2a2a2e;
+  --foreground: #f2f1ec;
+  --muted: #a3a29b;
+  --accent: #c9a24b;
+  --accent-foreground: #14120a;
+  --danger: #c1553d;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
+
+/* react-pdf text/annotation layers */
+.react-pdf__Page {
+  display: flex;
+  justify-content: center;
+}
+
+.react-pdf__Page__canvas {
+  border-radius: 4px;
+  max-width: 100%;
+  height: auto !important;
+  box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+.react-pdf__Page__textContent,
+.react-pdf__Page__annotations {
+  display: none;
+}
