@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 
+// This is an authenticated, per-visit page (the project list changes as
+// you create/edit projects) — never prerender it as static, which would
+// both bake in a stale snapshot and require a reachable database at build
+// time rather than at request time.
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboard() {
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" },
