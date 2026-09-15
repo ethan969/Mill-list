@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+}
+
+enum DocumentSection {
+  SCRIPT
+  CREATIVE_DECK
+  FINANCIALS
+  PRODUCTION_PLAN
+}
+
+enum GalleryItemType {
+  IMAGE
+  VIDEO
+}
+
+model Project {
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  title             String
+  productionCompany String
+  tagline           String?
+  logline           String?
+  posterKey         String?
+  posterMimeType    String?
+  accentColor       String   @default("#C9A24B")
+  passwordHash      String
+  isPublished       Boolean  @default(false)
+  aboutContent      String?
+  aboutTeam         Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  documents  Document[]
+  gallery    GalleryItem[]
+  references ReferenceLink[]
+  downloads  DocumentDownload[]
+
+  @@index([slug])
+}
+
+model Document {
+  id        String          @id @default(cuid())
+  projectId String
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  section   DocumentSection
+  title     String
+  fileKey   String
+  fileName  String          @default("document.pdf")
+  mimeType  String          @default("application/pdf")
+  fileSize  Int?
+  pageCount Int?
+  order     Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  downloads DocumentDownload[]
+
+  @@index([projectId, section])
+}
+
+model GalleryItem {
+  id        String          @id @default(cuid())
+  projectId String
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type      GalleryItemType
+  fileKey   String
+  fileName  String          @default("file")
+  mimeType  String          @default("application/octet-stream")
+  caption   String?
+  order     Int             @default(0)
+  createdAt DateTime        @default(now())
+
+  @@index([projectId])
+}
+
+model ReferenceLink {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label     String
+  url       String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+/// Recorded each time someone provides their email to download a
+/// watermarked copy of a document from the data room.
+model DocumentDownload {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  email      String
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([projectId])
+  @@index([email])
+}
