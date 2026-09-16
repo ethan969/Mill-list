@@ -58,11 +58,22 @@ S3-compatible object storage (falls back to local disk in dev) · pdf-lib
    ```
 
 4. **Create your admin account** — set `ADMIN_EMAIL` / `ADMIN_PASSWORD` in
-   `.env`, then:
+   `.env`, then either run:
 
    ```bash
    npm run seed:admin
    ```
+
+   or, especially useful on a deployed environment where you don't have a
+   terminal open against the database (e.g. right after a Vercel deploy),
+   visit `/api/admin/seed?token=<your SESSION_SECRET>` in a browser. Both do
+   the same thing — create the admin account if it doesn't exist yet, or
+   reset its password to match `ADMIN_PASSWORD` if it does — and are safe to
+   re-run any time you want to reset the admin password. The route is gated
+   by `SESSION_SECRET` itself (compared against the `token` query param), so
+   only someone with access to your project's environment variables can use
+   it, and it never accepts credentials from the request — only from
+   `ADMIN_EMAIL`/`ADMIN_PASSWORD` already configured on the server.
 
 5. **Start the app**
 

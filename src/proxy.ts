@@ -19,7 +19,14 @@ async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/admin/login" || pathname === "/api/admin/login") {
+  if (
+    pathname === "/admin/login" ||
+    pathname === "/api/admin/login" ||
+    pathname === "/api/admin/seed"
+  ) {
+    // /api/admin/seed has its own gate (a token compared against
+    // SESSION_SECRET, in the route handler itself) — it must be reachable
+    // before an admin session exists, since it's what creates the first one.
     return NextResponse.next();
   }
 
