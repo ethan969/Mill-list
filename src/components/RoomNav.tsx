@@ -3,18 +3,22 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ROOM_NAV } from "@/lib/sections";
+import type { RoomAvailability } from "@/lib/room-availability";
 
 export default function RoomNav({
   slug,
   title,
   logoUrl,
+  availability,
 }: {
   slug: string;
   title: string;
   logoUrl?: string | null;
+  availability: RoomAvailability;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const items = ROOM_NAV.filter((item) => availability[item.slug]);
 
   async function handleExit() {
     await fetch(`/api/room/${slug}/logout`, { method: "POST" });
@@ -39,25 +43,27 @@ export default function RoomNav({
             Exit room
           </button>
         </div>
-        <nav className="-mb-4 flex gap-5 overflow-x-auto pb-4 text-sm">
-          {ROOM_NAV.map((item) => {
-            const href = `/${slug}/room/${item.slug}`;
-            const active = pathname?.startsWith(href);
-            return (
-              <Link
-                key={item.slug}
-                href={href}
-                className={`whitespace-nowrap border-b-2 pb-1 transition-colors ${
-                  active
-                    ? "border-accent text-foreground"
-                    : "border-transparent text-muted hover:text-foreground"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {items.length > 0 && (
+          <nav className="-mb-4 flex gap-5 overflow-x-auto pb-4 text-sm">
+            {items.map((item) => {
+              const href = `/${slug}/room/${item.slug}`;
+              const active = pathname?.startsWith(href);
+              return (
+                <Link
+                  key={item.slug}
+                  href={href}
+                  className={`whitespace-nowrap border-b-2 pb-1 transition-colors ${
+                    active
+                      ? "border-accent text-foreground"
+                      : "border-transparent text-muted hover:text-foreground"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
       </div>
     </header>
   );

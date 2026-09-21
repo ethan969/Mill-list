@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getRoomAvailability, firstAvailableSection } from "@/lib/room-availability";
 import EmptyState from "@/components/EmptyState";
 
 type TeamMember = { name: string; role?: string; bio?: string };
@@ -13,7 +14,12 @@ export default async function AboutPage({
 
   const project = await prisma.project.findUnique({
     where: { slug },
-    select: { productionCompany: true, aboutContent: true, aboutTeam: true },
+    select: {
+      id: true,
+      productionCompany: true,
+      aboutContent: true,
+      aboutTeam: true,
+    },
   });
   if (!project) notFound();
 
@@ -22,6 +28,8 @@ export default async function AboutPage({
     : [];
 
   if (!project.aboutContent && team.length === 0) {
+    const fallback = firstAvailableSection(await getRoomAvailability(project.id));
+    if (fallback) redirect(`/${slug}/room/${fallback}`);
     return <EmptyState label="An about page" />;
   }
 

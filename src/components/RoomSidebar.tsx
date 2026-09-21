@@ -3,18 +3,22 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ROOM_NAV } from "@/lib/sections";
+import type { RoomAvailability } from "@/lib/room-availability";
 
 export default function RoomSidebar({
   slug,
   title,
   logoUrl,
+  availability,
 }: {
   slug: string;
   title: string;
   logoUrl?: string | null;
+  availability: RoomAvailability;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const items = ROOM_NAV.filter((item) => availability[item.slug]);
 
   async function handleExit() {
     await fetch(`/api/room/${slug}/logout`, { method: "POST" });
@@ -34,7 +38,10 @@ export default function RoomSidebar({
           </p>
         )}
         <nav className="mt-8 flex flex-col gap-1 text-sm">
-          {ROOM_NAV.map((item) => {
+          {items.length === 0 && (
+            <p className="text-xs text-muted">Nothing published yet.</p>
+          )}
+          {items.map((item) => {
             const href = `/${slug}/room/${item.slug}`;
             const active = pathname?.startsWith(href);
             return (

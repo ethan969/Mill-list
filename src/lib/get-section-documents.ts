@@ -19,5 +19,5 @@ export async function getSectionDocuments(
     select: { id: true, title: true, pageCount: true },
   });
 
-  return documents;
+  return { projectId: project.id, documents };
 }

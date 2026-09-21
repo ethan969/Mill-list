@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getRoomSession } from "@/lib/auth";
+import { getRoomAvailability } from "@/lib/room-availability";
 import RoomNav from "@/components/RoomNav";
 import RoomSidebar from "@/components/RoomSidebar";
 import ThemeWrapper from "@/components/ThemeWrapper";
@@ -33,6 +34,7 @@ export default async function RoomLayout({
   }
 
   const logoUrl = project.logoKey ? `/api/projects/${slug}/logo` : null;
+  const availability = await getRoomAvailability(project.id);
 
   if (project.roomLayout === "sidebar") {
     return (
@@ -42,7 +44,12 @@ export default async function RoomLayout({
         fontId={project.fontId}
         className="flex flex-1"
       >
-        <RoomSidebar slug={slug} title={project.title} logoUrl={logoUrl} />
+        <RoomSidebar
+          slug={slug}
+          title={project.title}
+          logoUrl={logoUrl}
+          availability={availability}
+        />
         <main className="w-full max-w-4xl flex-1 px-5 py-10 sm:px-10">
           {children}
         </main>
@@ -57,7 +64,12 @@ export default async function RoomLayout({
       fontId={project.fontId}
       className="flex flex-1 flex-col"
     >
-      <RoomNav slug={slug} title={project.title} logoUrl={logoUrl} />
+      <RoomNav
+        slug={slug}
+        title={project.title}
+        logoUrl={logoUrl}
+        availability={availability}
+      />
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:px-8">
         {children}
       </main>

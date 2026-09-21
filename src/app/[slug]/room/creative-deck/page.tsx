@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { getSectionDocuments } from "@/lib/get-section-documents";
+import { getRoomAvailability, firstAvailableSection } from "@/lib/room-availability";
 import DocumentSectionView from "@/components/DocumentSectionView";
 import EmptyState from "@/components/EmptyState";
 
@@ -8,8 +10,12 @@ export default async function CreativeDeckPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const documents = await getSectionDocuments(slug, "CREATIVE_DECK");
+  const { projectId, documents } = await getSectionDocuments(slug, "CREATIVE_DECK");
 
-  if (documents.length === 0) return <EmptyState label="The creative deck" />;
+  if (documents.length === 0) {
+    const fallback = firstAvailableSection(await getRoomAvailability(projectId));
+    if (fallback) redirect(`/${slug}/room/${fallback}`);
+    return <EmptyState label="The creative deck" />;
+  }
   return <DocumentSectionView documents={documents} />;
 }

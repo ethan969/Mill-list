@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getRoomAvailability, firstAvailableSection } from "@/lib/room-availability";
 import GalleryGrid from "@/components/GalleryGrid";
 import EmptyState from "@/components/EmptyState";
 
@@ -29,6 +30,8 @@ export default async function GalleryPage({
   ]);
 
   if (gallery.length === 0 && references.length === 0) {
+    const fallback = firstAvailableSection(await getRoomAvailability(project.id));
+    if (fallback) redirect(`/${slug}/room/${fallback}`);
     return <EmptyState label="Gallery & references" />;
   }
 
