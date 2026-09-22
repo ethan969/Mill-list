@@ -43,7 +43,7 @@ export default function PasswordGateForm({ slug }: { slug: string }) {
       >
         Enter password
       </label>
-      <div className="flex gap-2">
+      <div className="flex items-center gap-1 rounded-full border border-border bg-surface/80 p-1 pl-4 shadow-lg shadow-black/20 transition-colors focus-within:border-accent">
         <input
           id="password"
           type="password"
@@ -51,13 +51,13 @@ export default function PasswordGateForm({ slug }: { slug: string }) {
           autoComplete="off"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="flex-1 rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-foreground outline-none focus:border-accent transition-colors"
+          className="flex-1 bg-transparent py-2 text-sm text-foreground outline-none placeholder:text-muted/50"
           placeholder="••••••••"
         />
         <button
           type="submit"
           disabled={isPending || password.length === 0}
-          className="rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground transition-opacity disabled:opacity-40 hover:opacity-90"
+          className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition-all disabled:opacity-40 disabled:hover:scale-100 hover:opacity-90 hover:scale-[1.03]"
         >
           {isPending ? "…" : "Enter"}
         </button>
