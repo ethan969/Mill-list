@@ -171,3 +171,19 @@ export async function getPresignedUploadUrl(
   });
   return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
 }
+
+/**
+ * A short-lived URL the browser can GET a file from directly. Used so the
+ * flick-through viewer reads straight from storage — which natively
+ * supports HTTP Range requests for progressive page-by-page loading —
+ * instead of proxying the whole file through this server on every open
+ * (our own proxy route has no Range support, so a large document had to
+ * download in full before the first page could render, on every visit).
+ */
+export async function getPresignedDownloadUrl(
+  key: string,
+  expiresInSeconds = 900
+): Promise<string> {
+  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+  return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
+}
