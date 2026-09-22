@@ -1,17 +1,10 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { putObject, buildAssetKey } from "@/lib/storage";
-
-const ALLOWED = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "video/mp4",
-  "video/webm",
-  "video/quicktime",
-]);
+import { createGalleryItemRecord } from "@/lib/gallery";
+import { GALLERY_MIME_TYPES, MAX_GALLERY_BYTES } from "@/lib/upload-limits";
 
 export async function GET(
   _request: NextRequest,
@@ -28,6 +21,9 @@ export async function GET(
   return NextResponse.json({ gallery });
 }
 
+// Classic proxied upload — see the equivalent documents route for why this
+// exists alongside presign/confirm (local-disk fallback + a size-capped
+// fallback path).
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -46,40 +42,32 @@ export async function POST(
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
   }
-  if (!ALLOWED.has(file.type)) {
+  if (!GALLERY_MIME_TYPES.has(file.type)) {
     return NextResponse.json(
       { error: "Unsupported file type for gallery." },
       { status: 400 }
     );
   }
+  if (file.size > MAX_GALLERY_BYTES) {
+    return NextResponse.json(
+      { error: `File is too large (max ${Math.floor(MAX_GALLERY_BYTES / 1024 / 1024)}MB).` },
+      { status: 400 }
+    );
+  }
 
   const type = file.type.startsWith("video/") ? "VIDEO" : "IMAGE";
-
-  const maxOrder = await prisma.galleryItem.aggregate({
-    where: { projectId: id },
-    _max: { order: true },
-  });
-
-  const item = await prisma.galleryItem.create({
-    data: {
-      projectId: id,
-      type,
-      fileKey: "",
-      fileName: file.name,
-      mimeType: file.type,
-      caption: typeof caption === "string" && caption ? caption : null,
-      order: (maxOrder._max.order ?? -1) + 1,
-    },
-  });
-
   const buffer = Buffer.from(await file.arrayBuffer());
-  const key = buildAssetKey(id, "gallery", item.id, file.name);
+  const key = buildAssetKey(id, "gallery", randomUUID(), file.name);
   await putObject(key, buffer, file.type);
 
-  const updated = await prisma.galleryItem.update({
-    where: { id: item.id },
-    data: { fileKey: key },
+  const item = await createGalleryItemRecord({
+    projectId: id,
+    type,
+    fileName: file.name,
+    mimeType: file.type,
+    caption: typeof caption === "string" ? caption : null,
+    fileKey: key,
   });
 
-  return NextResponse.json({ item: updated }, { status: 201 });
+  return NextResponse.json({ item }, { status: 201 });
 }

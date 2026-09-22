@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { inputClass, Field } from "@/components/admin/FormField";
 import type { AdminDocument, AdminProject } from "@/components/admin/types";
 import type { SectionDef } from "@/lib/sections";
+import { uploadViaPresign } from "@/lib/client-upload";
 
 export default function DocumentsPanel({
   project,
@@ -21,6 +22,7 @@ export default function DocumentsPanel({
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,23 +30,45 @@ export default function DocumentsPanel({
     e.preventDefault();
     if (!file) return;
     setUploading(true);
+    setProgress(0);
     setError(null);
 
     try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("section", section.key);
-      body.append("title", title);
-      const res = await fetch(
-        `/api/admin/projects/${project.id}/documents`,
-        { method: "POST", body }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "Upload failed.");
+      const result = await uploadViaPresign<{ document: AdminDocument }>({
+        file,
+        presignPath: `/api/admin/projects/${project.id}/documents/presign`,
+        confirmPath: `/api/admin/projects/${project.id}/documents/confirm`,
+        presignExtra: { section: section.key },
+        confirmExtra: { section: section.key, title },
+        onProgress: setProgress,
+      });
+
+      if (result.status === "error") {
+        setError(result.message);
         return;
       }
-      onUpdate({ documents: [...project.documents, data.document] });
+
+      if (result.status === "not_configured") {
+        // No cloud storage configured (local dev) — fall back to the
+        // classic proxied upload, which has no size-limit concerns there.
+        const body = new FormData();
+        body.append("file", file);
+        body.append("section", section.key);
+        body.append("title", title);
+        const res = await fetch(
+          `/api/admin/projects/${project.id}/documents`,
+          { method: "POST", body }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || "Upload failed.");
+          return;
+        }
+        onUpdate({ documents: [...project.documents, data.document] });
+      } else {
+        onUpdate({ documents: [...project.documents, result.data.document] });
+      }
+
       setTitle("");
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -52,6 +76,7 @@ export default function DocumentsPanel({
       setError("Network error.");
     } finally {
       setUploading(false);
+      setProgress(0);
     }
   }
 
@@ -117,12 +142,24 @@ export default function DocumentsPanel({
           className="text-xs text-muted"
         />
         {error && <p className="text-xs text-danger">{error}</p>}
+        {uploading && progress > 0 && (
+          <div className="h-1 w-full overflow-hidden rounded-full bg-border">
+            <div
+              className="h-full bg-accent transition-[width]"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+        )}
         <button
           type="submit"
           disabled={!file || uploading}
           className="self-start rounded-md bg-accent px-4 py-2 text-xs font-medium text-accent-foreground disabled:opacity-40 hover:opacity-90 transition-opacity"
         >
-          {uploading ? "Uploading…" : "Upload"}
+          {uploading
+            ? progress > 0
+              ? `Uploading… ${Math.round(progress * 100)}%`
+              : "Preparing…"
+            : "Upload"}
         </button>
       </form>
 

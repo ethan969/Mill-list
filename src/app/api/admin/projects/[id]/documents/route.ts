@@ -1,8 +1,11 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { putObject, buildAssetKey } from "@/lib/storage";
+import { createDocumentRecord } from "@/lib/documents";
 import { DOCUMENT_SECTIONS } from "@/lib/sections";
+import { DOCUMENT_MIME_TYPES, MAX_DOCUMENT_BYTES } from "@/lib/upload-limits";
 import type { DocumentSection } from "@prisma/client";
 
 const SECTION_KEYS = new Set(DOCUMENT_SECTIONS.map((s) => s.key));
@@ -22,6 +25,11 @@ export async function GET(
   return NextResponse.json({ documents });
 }
 
+// Classic proxied upload — used for the local-disk storage fallback (dev),
+// and as a fallback if cloud storage presigning isn't available. On a
+// serverless host this is capped by the platform's request body limit
+// (4.5MB on Vercel); large files must go through the presign/confirm pair
+// instead, which uploads straight from the browser to cloud storage.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -44,44 +52,32 @@ export async function POST(
   if (typeof section !== "string" || !SECTION_KEYS.has(section as DocumentSection)) {
     return NextResponse.json({ error: "Invalid section." }, { status: 400 });
   }
-  if (file.type !== "application/pdf") {
+  if (!DOCUMENT_MIME_TYPES.has(file.type)) {
     return NextResponse.json(
       { error: "Documents must be uploaded as PDF for the flick-through viewer and watermarking to work." },
       { status: 400 }
     );
   }
-
-  const finalTitle =
-    typeof title === "string" && title.trim().length > 0
-      ? title.trim()
-      : file.name.replace(/\.pdf$/i, "");
-
-  const maxOrder = await prisma.document.aggregate({
-    where: { projectId: id, section: section as DocumentSection },
-    _max: { order: true },
-  });
-
-  const document = await prisma.document.create({
-    data: {
-      projectId: id,
-      section: section as DocumentSection,
-      title: finalTitle,
-      fileKey: "",
-      fileName: file.name,
-      mimeType: file.type,
-      fileSize: file.size,
-      order: (maxOrder._max.order ?? -1) + 1,
-    },
-  });
+  if (file.size > MAX_DOCUMENT_BYTES) {
+    return NextResponse.json(
+      { error: `File is too large (max ${Math.floor(MAX_DOCUMENT_BYTES / 1024 / 1024)}MB).` },
+      { status: 400 }
+    );
+  }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const key = buildAssetKey(id, "documents", document.id, file.name);
+  const key = buildAssetKey(id, "documents", randomUUID(), file.name);
   await putObject(key, buffer, file.type);
 
-  const updated = await prisma.document.update({
-    where: { id: document.id },
-    data: { fileKey: key },
+  const document = await createDocumentRecord({
+    projectId: id,
+    section: section as DocumentSection,
+    title: typeof title === "string" ? title : null,
+    fileName: file.name,
+    mimeType: file.type,
+    fileSize: file.size,
+    fileKey: key,
   });
 
-  return NextResponse.json({ document: updated }, { status: 201 });
+  return NextResponse.json({ document }, { status: 201 });
 }

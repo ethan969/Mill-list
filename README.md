@@ -88,6 +88,37 @@ aren't set, uploaded files are written to `./storage` on disk. Fill in the
 `STORAGE_*` variables (any S3-compatible provider — Cloudflare R2 is a good,
 cheap default) before deploying anywhere with ephemeral or serverless disk.
 
+**If you're using R2 (or another provider) on a platform with a request body
+limit** (Vercel caps Serverless Functions at 4.5MB, which most documents and
+any video will exceed), **you must add a CORS policy to the bucket**, or
+uploads will fail with a browser-side CORS error even though everything else
+is configured correctly. Large document/gallery uploads go straight from the
+browser to your bucket via a presigned URL rather than through the app
+server (`src/lib/client-upload.ts` + the `presign`/`confirm` route pairs
+under each upload endpoint), specifically to get around that body-size cap
+— but that means the browser is now making a cross-origin request straight
+to `*.r2.cloudflarestorage.com`, which R2 blocks by default. In the bucket's
+settings (Cloudflare dashboard → R2 → your bucket → Settings → CORS Policy),
+add:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://your-deployed-domain.vercel.app"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+replacing the origin with your actual deployed URL (add more entries to the
+array for a custom domain or a local dev URL, if needed). The local-disk
+fallback and any deployment without `STORAGE_*` set don't need this — they
+never make a cross-origin request in the first place, and fall back to
+routing the upload through the server instead (bounded by whatever body-size
+limit that platform imposes).
+
 Email delivery is also optional for local development — if `RESEND_API_KEY`
 isn't set, requested download links are logged to the server console instead
 of emailed, so the app stays fully usable without a provider account. Set
@@ -193,11 +224,6 @@ balancer, swap `src/lib/rate-limit.ts` for a shared store (e.g. Redis).
 - **Local disk storage fallback** (`./storage`) is for development only —
   it will not survive redeploys on most serverless hosting. Configure
   `STORAGE_*` before going live.
-- **Large video uploads** go through a Next.js API route (`request.formData()`),
-  which is simple but subject to your host's request body size limit (this
-  can be small on serverless platforms). If you need to host large sizzle
-  reels, either raise that limit on your platform or move gallery video
-  uploads to presigned direct-to-storage uploads.
 - **Rate limiting** is in-memory and per-instance (see above).
 - **About Us** currently supports plain-text/paragraph copy and a text-only
   team list (no individual headshots) to keep the asset model simple —

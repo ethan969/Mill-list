@@ -4,8 +4,10 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const BUCKET = process.env.STORAGE_BUCKET;
 const ENDPOINT = process.env.STORAGE_ENDPOINT;
@@ -100,6 +102,33 @@ export async function getObjectWebStream(
   });
 }
 
+/**
+ * Confirm an object actually landed in cloud storage (after a presigned
+ * direct upload) and get its real size, rather than trusting whatever size
+ * the browser claimed. Returns null if the object doesn't exist.
+ */
+export async function headObject(
+  key: string
+): Promise<{ size: number } | null> {
+  if (!isCloudStorageConfigured) {
+    try {
+      const stat = await fs.stat(localPath(key));
+      return { size: stat.size };
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const res = await getClient().send(
+      new HeadObjectCommand({ Bucket: BUCKET, Key: key })
+    );
+    return { size: res.ContentLength ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteObject(key: string): Promise<void> {
   if (isCloudStorageConfigured) {
     await getClient().send(
@@ -120,4 +149,25 @@ export function buildAssetKey(
 ): string {
   const ext = path.extname(fileName) || "";
   return `projects/${projectId}/${category}/${id}${ext}`;
+}
+
+/**
+ * A short-lived URL the browser can PUT a file to directly, bypassing our
+ * server entirely for the file bytes — the only way to accept files larger
+ * than a serverless platform's request body limit (Vercel caps it at
+ * 4.5MB). Only meaningful when cloud storage is configured; there's no
+ * equivalent for the local-disk fallback, which routes uploads through the
+ * server as before and is only really meant for development anyway.
+ */
+export async function getPresignedUploadUrl(
+  key: string,
+  contentType: string,
+  expiresInSeconds = 600
+): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: contentType,
+  });
+  return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
 }

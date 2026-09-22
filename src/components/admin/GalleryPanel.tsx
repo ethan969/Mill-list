@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { inputClass } from "@/components/admin/FormField";
-import type { AdminProject } from "@/components/admin/types";
+import type { AdminGalleryItem, AdminProject } from "@/components/admin/types";
+import { uploadViaPresign } from "@/lib/client-upload";
 
 export default function GalleryPanel({
   project,
@@ -13,6 +14,7 @@ export default function GalleryPanel({
 }) {
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -25,27 +27,49 @@ export default function GalleryPanel({
     const file = fileInputRef.current?.files?.[0];
     if (!file) return;
     setUploading(true);
+    setProgress(0);
     setError(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      if (caption) body.append("caption", caption);
-      const res = await fetch(`/api/admin/projects/${project.id}/gallery`, {
-        method: "POST",
-        body,
+      const result = await uploadViaPresign<{ item: AdminGalleryItem }>({
+        file,
+        presignPath: `/api/admin/projects/${project.id}/gallery/presign`,
+        confirmPath: `/api/admin/projects/${project.id}/gallery/confirm`,
+        confirmExtra: { caption },
+        onProgress: setProgress,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "Upload failed.");
+
+      if (result.status === "error") {
+        setError(result.message);
         return;
       }
-      onUpdate({ gallery: [...project.gallery, data.item] });
+
+      if (result.status === "not_configured") {
+        // No cloud storage configured (local dev) — fall back to the
+        // classic proxied upload, which has no size-limit concerns there.
+        const body = new FormData();
+        body.append("file", file);
+        if (caption) body.append("caption", caption);
+        const res = await fetch(`/api/admin/projects/${project.id}/gallery`, {
+          method: "POST",
+          body,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || "Upload failed.");
+          return;
+        }
+        onUpdate({ gallery: [...project.gallery, data.item] });
+      } else {
+        onUpdate({ gallery: [...project.gallery, result.data.item] });
+      }
+
       setCaption("");
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch {
       setError("Network error.");
     } finally {
       setUploading(false);
+      setProgress(0);
     }
   }
 
@@ -119,12 +143,24 @@ export default function GalleryPanel({
             onChange={(e) => setCaption(e.target.value)}
           />
           {error && <p className="text-xs text-danger">{error}</p>}
+          {uploading && progress > 0 && (
+            <div className="h-1 w-full overflow-hidden rounded-full bg-border">
+              <div
+                className="h-full bg-accent transition-[width]"
+                style={{ width: `${Math.round(progress * 100)}%` }}
+              />
+            </div>
+          )}
           <button
             type="submit"
             disabled={uploading}
             className="self-start rounded-md bg-accent px-4 py-2 text-xs font-medium text-accent-foreground disabled:opacity-40 hover:opacity-90 transition-opacity"
           >
-            {uploading ? "Uploading…" : "Upload"}
+            {uploading
+              ? progress > 0
+                ? `Uploading… ${Math.round(progress * 100)}%`
+                : "Preparing…"
+              : "Upload"}
           </button>
         </form>
 
