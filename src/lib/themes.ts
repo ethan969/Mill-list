@@ -204,14 +204,21 @@ export function themeStyleVars(
     : theme.colors.accentForeground;
   const fontVar = getFont(fontIdOverride)?.fontVar ?? theme.fontVar;
   return {
-    "--color-background": theme.colors.background,
-    "--color-surface": theme.colors.surface,
-    "--color-surface-raised": theme.colors.surfaceRaised,
-    "--color-border": theme.colors.border,
-    "--color-foreground": theme.colors.foreground,
-    "--color-muted": theme.colors.muted,
-    "--color-accent": accent,
-    "--color-accent-foreground": accentForeground,
+    // Tailwind's `@theme inline` block in globals.css maps e.g.
+    // --color-background to var(--background) and *inlines* that
+    // reference into every utility that uses it (so `.bg-background`
+    // compiles to `background-color: var(--background)`, not
+    // `var(--color-background)`). These per-project overrides have to
+    // target those underlying bare variable names, not the `--color-*`
+    // ones, or Tailwind's compiled utilities never see them.
+    "--background": theme.colors.background,
+    "--surface": theme.colors.surface,
+    "--surface-raised": theme.colors.surfaceRaised,
+    "--border": theme.colors.border,
+    "--foreground": theme.colors.foreground,
+    "--muted": theme.colors.muted,
+    "--accent": accent,
+    "--accent-foreground": accentForeground,
     "--font-display": `var(${fontVar})`,
   };
 }
