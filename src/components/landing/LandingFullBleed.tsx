@@ -1,3 +1,4 @@
+import Image from "next/image";
 import PasswordGateForm from "@/components/PasswordGateForm";
 import BrandMark from "@/components/landing/BrandMark";
 import type { LandingProject } from "@/components/landing/types";
@@ -11,11 +12,13 @@ export default function LandingFullBleed({
     <div className="relative isolate flex flex-1 flex-col justify-end">
       {project.hasPoster && (
         <div className="absolute inset-0 -z-10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={`/api/projects/${project.slug}/poster`}
             alt=""
-            className="h-full w-full object-cover"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
         </div>

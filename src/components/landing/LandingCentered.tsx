@@ -1,3 +1,4 @@
+import Image from "next/image";
 import PasswordGateForm from "@/components/PasswordGateForm";
 import BrandMark from "@/components/landing/BrandMark";
 import type { LandingProject } from "@/components/landing/types";
@@ -11,11 +12,13 @@ export default function LandingCentered({
     <div className="relative isolate flex flex-1 flex-col overflow-hidden">
       {project.hasPoster && (
         <div className="absolute inset-0 -z-20 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={`/api/projects/${project.slug}/poster`}
             alt=""
-            className="animate-kenburns h-full w-full scale-110 object-cover opacity-60"
+            fill
+            priority
+            sizes="100vw"
+            className="animate-kenburns scale-110 object-cover opacity-60"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/35 via-background/55 to-background" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/45" />

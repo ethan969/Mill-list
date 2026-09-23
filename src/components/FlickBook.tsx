@@ -7,11 +7,19 @@ pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 export default function FlickBook({
   fileUrl,
+  pdfWidth,
+  pdfHeight,
   onLoaded,
 }: {
   fileUrl: string;
+  // The PDF's own first-page size (in points), read at upload time — used
+  // only to reserve the correct aspect ratio before the viewer has loaded
+  // anything, so it doesn't pop in and shift the page below it.
+  pdfWidth?: number | null;
+  pdfHeight?: number | null;
   onLoaded?: (pageCount: number) => void;
 }) {
+  const aspectRatio = pdfWidth && pdfHeight ? pdfWidth / pdfHeight : undefined;
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageWidth, setPageWidth] = useState<number>(720);
@@ -70,25 +78,27 @@ export default function FlickBook({
         {error ? (
           <p className="text-sm text-danger">{error}</p>
         ) : (
-          <Document
-            file={fileUrl}
-            onLoadSuccess={({ numPages: n }) => {
-              setNumPages(n);
-              onLoaded?.(n);
-            }}
-            onLoadError={() => setError("Couldn't load this document.")}
-            loading={
-              <p className="text-sm text-muted">Loading document…</p>
-            }
-          >
-            <Page
-              pageNumber={pageNumber}
-              width={pageWidth}
-              renderTextLayer={false}
-              renderAnnotationLayer={false}
-              loading={<p className="text-sm text-muted">Loading page…</p>}
-            />
-          </Document>
+          <div style={aspectRatio ? { width: pageWidth, aspectRatio } : undefined}>
+            <Document
+              file={fileUrl}
+              onLoadSuccess={({ numPages: n }) => {
+                setNumPages(n);
+                onLoaded?.(n);
+              }}
+              onLoadError={() => setError("Couldn't load this document.")}
+              loading={
+                <p className="text-sm text-muted">Loading document…</p>
+              }
+            >
+              <Page
+                pageNumber={pageNumber}
+                width={pageWidth}
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+                loading={<p className="text-sm text-muted">Loading page…</p>}
+              />
+            </Document>
+          </div>
         )}
 
         {numPages && numPages > 1 && (
