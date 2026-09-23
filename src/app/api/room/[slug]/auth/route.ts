@@ -46,7 +46,7 @@ export async function POST(
   }
 
   await clearAttempts(rateKey);
-  await createRoomSession(project.id, project.slug);
+  await createRoomSession(project.id, project.slug, project.sessionVersion);
 
   return NextResponse.json({ ok: true });
 }

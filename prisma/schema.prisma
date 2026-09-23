@@ -69,6 +69,11 @@ model Project {
   landingLayout     String   @default("centered")
   roomLayout        String   @default("top-nav")
   passwordHash      String
+  /// Bumped whenever the room password changes or an admin explicitly
+  /// revokes viewer sessions — every room JWT carries the version it was
+  /// issued under (src/lib/auth.ts), so bumping this invalidates every
+  /// cookie issued before the bump without needing a session store.
+  sessionVersion    Int      @default(1)
   isPublished       Boolean  @default(false)
   aboutContent      String?
   aboutTeam         Json?

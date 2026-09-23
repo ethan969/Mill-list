@@ -84,7 +84,14 @@ export async function PATCH(
         ? { aboutContent: data.aboutContent }
         : {}),
       ...(data.aboutTeam !== undefined ? { aboutTeam: data.aboutTeam } : {}),
-      ...(data.password ? { passwordHash: await hashPassword(data.password) } : {}),
+      ...(data.password
+        ? {
+            passwordHash: await hashPassword(data.password),
+            // Invalidates every room session issued under the old
+            // password — see verifyRoomToken in src/lib/auth.ts.
+            sessionVersion: { increment: 1 },
+          }
+        : {}),
     },
   });
 

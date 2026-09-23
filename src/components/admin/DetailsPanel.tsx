@@ -24,6 +24,7 @@ export default function DetailsPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState(false);
   const [posterUploading, setPosterUploading] = useState(false);
   const [posterVersion, setPosterVersion] = useState(0);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -102,6 +103,36 @@ export default function DetailsPanel({
       setError("Network error.");
     } finally {
       setLogoUploading(false);
+    }
+  }
+
+  async function handleRevokeSessions() {
+    if (
+      !confirm(
+        "Sign out everyone currently viewing this room? They'll need to enter the password again."
+      )
+    ) {
+      return;
+    }
+    setRevoking(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(
+        `/api/admin/projects/${project.id}/revoke-sessions`,
+        { method: "POST" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Couldn't revoke sessions.");
+        return;
+      }
+      onUpdate(data.project);
+      setMessage("Every viewer session has been signed out.");
+    } catch {
+      setError("Network error.");
+    } finally {
+      setRevoking(false);
     }
   }
 
@@ -393,6 +424,26 @@ export default function DetailsPanel({
             className="rounded-md border border-border px-4 py-2 text-xs hover:border-accent hover:text-accent transition-colors disabled:opacity-40"
           >
             Update
+          </button>
+        </div>
+        <p className="text-xs text-muted">
+          Changing the password automatically signs out everyone currently
+          viewing this room.
+        </p>
+
+        <div className="mt-2 flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
+          <div>
+            <p className="text-sm">Revoke all viewer sessions</p>
+            <p className="text-xs text-muted">
+              Signs everyone out immediately, without changing the password.
+            </p>
+          </div>
+          <button
+            onClick={handleRevokeSessions}
+            disabled={revoking}
+            className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs text-danger hover:border-danger transition-colors disabled:opacity-40"
+          >
+            {revoking ? "Revoking…" : "Revoke"}
           </button>
         </div>
       </section>

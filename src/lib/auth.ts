@@ -1,7 +1,7 @@
-import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/db";
 
 const secretValue = process.env.SESSION_SECRET;
 if (!secretValue || secretValue.length < 16) {
@@ -54,6 +54,7 @@ type RoomSessionPayload = {
   kind: "room";
   projectId: string;
   slug: string;
+  sessionVersion: number;
 };
 
 type DownloadLinkPayload = {
@@ -153,8 +154,53 @@ export async function destroyPendingTwoFactorSession() {
 
 // ---- Data room sessions (per project) ----
 
-export async function createRoomSession(projectId: string, slug: string) {
-  const token = await sign({ kind: "room", projectId, slug }, ROOM_TTL_SECONDS);
+/**
+ * Signs a room token carrying the project's sessionVersion at issue time —
+ * split out from createRoomSession (which also touches the cookie store,
+ * unavailable outside a request) so it and verifyRoomToken below are
+ * plain, directly testable functions.
+ */
+export async function signRoomToken(
+  projectId: string,
+  slug: string,
+  sessionVersion: number
+): Promise<string> {
+  return sign({ kind: "room", projectId, slug, sessionVersion }, ROOM_TTL_SECONDS);
+}
+
+/**
+ * Verifies a room token's signature/shape *and* that its sessionVersion
+ * still matches the project's current one in the database — a password
+ * change or an explicit revoke (both bump Project.sessionVersion) makes
+ * every token signed before that moment fail here, even though the JWT
+ * itself is still validly signed and unexpired.
+ */
+export async function verifyRoomToken(
+  token: string,
+  slug: string
+): Promise<RoomSessionPayload | null> {
+  const payload = await verify<RoomSessionPayload>(token);
+  if (!payload || payload.kind !== "room" || payload.slug !== slug) {
+    return null;
+  }
+
+  const project = await prisma.project.findUnique({
+    where: { slug },
+    select: { sessionVersion: true },
+  });
+  if (!project || project.sessionVersion !== payload.sessionVersion) {
+    return null;
+  }
+
+  return payload;
+}
+
+export async function createRoomSession(
+  projectId: string,
+  slug: string,
+  sessionVersion: number
+) {
+  const token = await signRoomToken(projectId, slug, sessionVersion);
   const store = await cookies();
   store.set(roomCookieName(slug), token, {
     httpOnly: true,
@@ -171,11 +217,7 @@ export async function getRoomSession(
   const store = await cookies();
   const token = store.get(roomCookieName(slug))?.value;
   if (!token) return null;
-  const payload = await verify<RoomSessionPayload>(token);
-  if (!payload || payload.kind !== "room" || payload.slug !== slug) {
-    return null;
-  }
-  return payload;
+  return verifyRoomToken(token, slug);
 }
 
 export async function destroyRoomSession(slug: string) {
