@@ -175,6 +175,21 @@ export function getFont(id: string | null | undefined): FontOption | null {
   return FONTS.find((f) => f.id === id) ?? null;
 }
 
+/**
+ * The font id actually in effect for a project: its own override if set,
+ * else whichever curated font its theme suggests. Used to apply only that
+ * one font's next/font `.variable` class (see src/lib/loaded-fonts.ts)
+ * rather than loading all six globally.
+ */
+export function resolveFontId(
+  themeId: string | null | undefined,
+  fontIdOverride?: string | null
+): string {
+  if (fontIdOverride && getFont(fontIdOverride)) return fontIdOverride;
+  const theme = getTheme(themeId);
+  return FONTS.find((f) => f.fontVar === theme.fontVar)?.id ?? FONTS[0]!.id;
+}
+
 /** Picks readable black/white text for an arbitrary hex background color. */
 function readableForeground(hex: string): string {
   const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
