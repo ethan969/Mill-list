@@ -159,9 +159,12 @@ model DocumentDownload {
 /// Backs the per-key rate limiter (src/lib/rate-limit.ts) — a fixed window
 /// per key (e.g. "admin-login:<ip>", "room:<slug>:<ip>"), stored in
 /// Postgres instead of in-memory so it actually holds across Vercel's
-/// separate serverless instances. Rows aren't proactively swept once
-/// expired (only deleted on a successful auth, via clearAttempts); an
-/// expired row is simply treated as a fresh window on its next read.
+/// separate serverless instances. An expired row is simply treated as a
+/// fresh window on its next read (checkRateLimit), and is also deleted on
+/// a successful auth (clearAttempts). checkRateLimit additionally sweeps
+/// every already-expired row with small probability on each call
+/// (sweepExpiredAttempts) so the table doesn't grow unboundedly from keys
+/// that are never explicitly cleared — no separate cron job/route needed.
 model RateLimitAttempt {
   key     String   @id
   count   Int      @default(0)

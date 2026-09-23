@@ -4,6 +4,7 @@ import {
   checkRateLimit,
   recordAttempt,
   clearAttempts,
+  sweepExpiredAttempts,
   MAX_ATTEMPTS,
   WINDOW_MS,
 } from "@/lib/rate-limit";
@@ -72,6 +73,27 @@ describe("rate-limit (Postgres-backed)", () => {
     await clearAttempts(key);
 
     expect((await checkRateLimit(key)).allowed).toBe(true);
+  });
+
+  it("sweepExpiredAttempts deletes expired rows and leaves live ones alone", async () => {
+    const expiredKey = testKey();
+    const liveKey = testKey();
+    try {
+      await prisma.rateLimitAttempt.create({
+        data: { key: expiredKey, count: 3, resetAt: new Date(Date.now() - 1000) },
+      });
+      await prisma.rateLimitAttempt.create({
+        data: { key: liveKey, count: 3, resetAt: new Date(Date.now() + WINDOW_MS) },
+      });
+
+      const deleted = await sweepExpiredAttempts();
+      expect(deleted).toBeGreaterThanOrEqual(1);
+
+      expect(await prisma.rateLimitAttempt.findUnique({ where: { key: expiredKey } })).toBeNull();
+      expect(await prisma.rateLimitAttempt.findUnique({ where: { key: liveKey } })).not.toBeNull();
+    } finally {
+      await prisma.rateLimitAttempt.deleteMany({ where: { key: { in: [expiredKey, liveKey] } } });
+    }
   });
 
   it("keeps separate keys independent", async () => {

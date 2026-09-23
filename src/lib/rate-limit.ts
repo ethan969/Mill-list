@@ -13,9 +13,29 @@ import { prisma } from "@/lib/db";
 export const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 export const MAX_ATTEMPTS = 8;
 
+// Expired rows are harmless (an expired row is just treated as a fresh
+// window on its next read) but would otherwise grow the table forever,
+// since most keys are never explicitly cleared. Rather than a separate
+// cron job/route, each checkRateLimit call has a small chance of sweeping
+// every already-expired row — cheap on the common path (one Math.random()
+// call) and, across enough requests, keeps the table bounded without any
+// new deployment infrastructure.
+const SWEEP_PROBABILITY = 0.01;
+
+export async function sweepExpiredAttempts(): Promise<number> {
+  const { count } = await prisma.rateLimitAttempt.deleteMany({
+    where: { resetAt: { lt: new Date() } },
+  });
+  return count;
+}
+
 export async function checkRateLimit(
   key: string
 ): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  if (Math.random() < SWEEP_PROBABILITY) {
+    await sweepExpiredAttempts();
+  }
+
   const now = new Date();
   const entry = await prisma.rateLimitAttempt.findUnique({ where: { key } });
 
