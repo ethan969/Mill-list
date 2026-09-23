@@ -9,7 +9,7 @@ export default function LandingFullBleed({
   project: LandingProject;
 }) {
   return (
-    <div className="relative flex flex-1 flex-col justify-end">
+    <div className="relative isolate flex flex-1 flex-col justify-end">
       {project.hasPoster && (
         <div className="absolute inset-0 -z-10">
           <Image

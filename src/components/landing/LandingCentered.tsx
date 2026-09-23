@@ -9,29 +9,41 @@ export default function LandingCentered({
   project: LandingProject;
 }) {
   return (
-    <div className="relative flex flex-1 flex-col">
+    <div className="relative isolate flex flex-1 flex-col overflow-hidden">
       {project.hasPoster && (
-        <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 -z-20 overflow-hidden">
           <Image
             src={`/api/projects/${project.slug}/poster`}
             alt=""
             fill
             priority
             sizes="100vw"
-            className="object-cover opacity-25"
+            className="animate-kenburns scale-110 object-cover opacity-60"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/35 via-background/55 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/45" />
         </div>
       )}
+      <div aria-hidden className="grain-overlay -z-10" />
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
-        <BrandMark project={project} className="animate-fade-up mb-6" />
-        <h1 className="animate-fade-up mt-5 max-w-3xl text-balance font-display text-5xl font-medium leading-tight sm:text-7xl">
+        <BrandMark project={project} className="animate-fade-up mb-7" />
+        <div
+          className="animate-fade-up h-px w-10 bg-accent/70"
+          style={{ animationDelay: "0.05s" }}
+        />
+        <h1
+          className={`animate-fade-up mt-7 max-w-4xl text-balance font-display text-6xl font-medium leading-[0.95] tracking-tight sm:text-8xl ${
+            project.hasPoster ? "text-shadow-hero" : ""
+          }`}
+        >
           {project.title}
         </h1>
         {project.tagline && (
           <p
-            className="animate-fade-up mt-6 max-w-xl text-balance text-base text-muted"
+            className={`animate-fade-up mt-7 max-w-xl text-balance text-base text-muted sm:text-lg ${
+              project.hasPoster ? "text-shadow-hero" : ""
+            }`}
             style={{ animationDelay: "0.1s" }}
           >
             {project.tagline}
@@ -39,17 +51,17 @@ export default function LandingCentered({
         )}
 
         <div
-          className="animate-fade-up mt-14 flex flex-col items-center"
-          style={{ animationDelay: "0.15s" }}
+          className="animate-fade-up mt-16 flex flex-col items-center rounded-xl border border-border/60 bg-surface/50 px-8 py-7 backdrop-blur-sm"
+          style={{ animationDelay: "0.18s" }}
         >
-          <p className="mb-5 text-xs uppercase tracking-[0.3em] text-muted">
+          <p className="mb-5 text-[11px] uppercase tracking-[0.35em] text-muted">
             Private Data Room
           </p>
           <PasswordGateForm slug={project.slug} />
         </div>
       </div>
 
-      <footer className="pb-8 text-center text-[11px] text-muted/60">
+      <footer className="relative border-t border-border/30 pb-8 pt-6 text-center text-[11px] tracking-wide text-muted/70">
         For authorized recipients only. Materials are confidential.
       </footer>
     </div>
