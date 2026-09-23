@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { verifyRoomToken } from "@/lib/room-token";
 
 const secretValue = process.env.SESSION_SECRET || "";
 const secret = new TextEncoder().encode(secretValue);
@@ -14,6 +15,20 @@ async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// Proxy defaults to the Node.js runtime in Next.js 16, so it can call
+// verifyRoomToken directly (Prisma included) — this stops an unauthenticated
+// or session-version-revoked request from ever reaching room page code,
+// rather than relying solely on the page-level requireRoomAccess() guard.
+async function hasValidRoomSession(
+  request: NextRequest,
+  slug: string
+): Promise<boolean> {
+  const token = request.cookies.get(`room_${slug}`)?.value;
+  if (!token) return false;
+  const payload = await verifyRoomToken(token, slug);
+  return Boolean(payload);
 }
 
 const ADMIN_API_2FA_EXEMPT = new Set([
@@ -56,11 +71,22 @@ export async function proxy(request: NextRequest) {
       const url = new URL("/admin/login", request.url);
       return NextResponse.redirect(url);
     }
+    return NextResponse.next();
+  }
+
+  const roomMatch = pathname.match(/^\/([^/]+)\/room(?:\/|$)/);
+  if (roomMatch) {
+    const slug = roomMatch[1];
+    const ok = await hasValidRoomSession(request, slug);
+    if (!ok) {
+      const url = new URL(`/${slug}`, request.url);
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/:slug/room/:path*"],
 };

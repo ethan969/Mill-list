@@ -1,7 +1,15 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/db";
+import {
+  signRoomToken,
+  verifyRoomToken,
+  roomCookieName,
+  ROOM_TTL_SECONDS,
+  type RoomSessionPayload,
+} from "@/lib/room-token";
+
+export { signRoomToken, verifyRoomToken };
 
 const secretValue = process.env.SESSION_SECRET;
 if (!secretValue || secretValue.length < 16) {
@@ -15,12 +23,7 @@ const ADMIN_COOKIE = "admin_session";
 const ADMIN_TTL_SECONDS = 60 * 60 * 12; // 12 hours
 const PENDING_2FA_COOKIE = "admin_2fa_pending";
 const PENDING_2FA_TTL_SECONDS = 60 * 5; // 5 minutes — just long enough to enter a code
-const ROOM_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const DOWNLOAD_LINK_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
-
-function roomCookieName(slug: string) {
-  return `room_${slug}`;
-}
 
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, 12);
@@ -50,13 +53,6 @@ type PendingTwoFactorPayload = {
   email: string;
 };
 
-type RoomSessionPayload = {
-  kind: "room";
-  projectId: string;
-  slug: string;
-  sessionVersion: number;
-};
-
 type DownloadLinkPayload = {
   kind: "download";
   downloadId: string;
@@ -65,11 +61,7 @@ type DownloadLinkPayload = {
 };
 
 async function sign(
-  payload:
-    | AdminSessionPayload
-    | PendingTwoFactorPayload
-    | RoomSessionPayload
-    | DownloadLinkPayload,
+  payload: AdminSessionPayload | PendingTwoFactorPayload | DownloadLinkPayload,
   ttlSeconds: number
 ): Promise<string> {
   return new SignJWT({ ...payload })
@@ -153,47 +145,9 @@ export async function destroyPendingTwoFactorSession() {
 }
 
 // ---- Data room sessions (per project) ----
-
-/**
- * Signs a room token carrying the project's sessionVersion at issue time —
- * split out from createRoomSession (which also touches the cookie store,
- * unavailable outside a request) so it and verifyRoomToken below are
- * plain, directly testable functions.
- */
-export async function signRoomToken(
-  projectId: string,
-  slug: string,
-  sessionVersion: number
-): Promise<string> {
-  return sign({ kind: "room", projectId, slug, sessionVersion }, ROOM_TTL_SECONDS);
-}
-
-/**
- * Verifies a room token's signature/shape *and* that its sessionVersion
- * still matches the project's current one in the database — a password
- * change or an explicit revoke (both bump Project.sessionVersion) makes
- * every token signed before that moment fail here, even though the JWT
- * itself is still validly signed and unexpired.
- */
-export async function verifyRoomToken(
-  token: string,
-  slug: string
-): Promise<RoomSessionPayload | null> {
-  const payload = await verify<RoomSessionPayload>(token);
-  if (!payload || payload.kind !== "room" || payload.slug !== slug) {
-    return null;
-  }
-
-  const project = await prisma.project.findUnique({
-    where: { slug },
-    select: { sessionVersion: true },
-  });
-  if (!project || project.sessionVersion !== payload.sessionVersion) {
-    return null;
-  }
-
-  return payload;
-}
+// signRoomToken/verifyRoomToken live in @/lib/room-token (re-exported above)
+// so they have no next/headers dependency and can be called from
+// src/proxy.ts, which runs before Next's per-request RSC cookie context.
 
 export async function createRoomSession(
   projectId: string,
