@@ -1,4 +1,5 @@
-import { themeStyleVars } from "@/lib/themes";
+import { themeStyleVars, resolveFontId } from "@/lib/themes";
+import { DISPLAY_FONT_VARIABLES } from "@/lib/loaded-fonts";
 
 export default function ThemeWrapper({
   themeId,
@@ -13,9 +14,15 @@ export default function ThemeWrapper({
   className?: string;
   children: React.ReactNode;
 }) {
+  // Apply only the one font variable this project actually needs, rather
+  // than relying on all six being globally available — see
+  // src/lib/loaded-fonts.ts.
+  const resolvedFontId = resolveFontId(themeId, fontId);
+  const fontVariableClass = DISPLAY_FONT_VARIABLES[resolvedFontId] ?? "";
+
   return (
     <div
-      className={`bg-background text-foreground ${className ?? ""}`}
+      className={`${fontVariableClass} bg-background text-foreground ${className ?? ""}`}
       style={themeStyleVars(themeId, accentColor, fontId) as React.CSSProperties}
     >
       {children}
