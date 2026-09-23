@@ -20,7 +20,7 @@ if (!secretValue || secretValue.length < 16) {
 const secret = new TextEncoder().encode(secretValue);
 
 const ADMIN_COOKIE = "admin_session";
-const ADMIN_TTL_SECONDS = 60 * 60 * 12; // 12 hours
+const ADMIN_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 const PENDING_2FA_COOKIE = "admin_2fa_pending";
 const PENDING_2FA_TTL_SECONDS = 60 * 5; // 5 minutes — just long enough to enter a code
 const DOWNLOAD_LINK_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
