@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { putObject, buildAssetKey } from "@/lib/storage";
 import { createDocumentRecord } from "@/lib/documents";
+import { getPdfPageSize } from "@/lib/pdf-dimensions";
 import { DOCUMENT_SECTIONS } from "@/lib/sections";
 import { DOCUMENT_MIME_TYPES, MAX_DOCUMENT_BYTES } from "@/lib/upload-limits";
 import type { DocumentSection } from "@prisma/client";
@@ -68,6 +69,7 @@ export async function POST(
   const buffer = Buffer.from(await file.arrayBuffer());
   const key = buildAssetKey(id, "documents", randomUUID(), file.name);
   await putObject(key, buffer, file.type);
+  const pageSize = await getPdfPageSize(buffer);
 
   const document = await createDocumentRecord({
     projectId: id,
@@ -77,6 +79,8 @@ export async function POST(
     mimeType: file.type,
     fileSize: file.size,
     fileKey: key,
+    pageWidth: pageSize?.width,
+    pageHeight: pageSize?.height,
   });
 
   return NextResponse.json({ document }, { status: 201 });

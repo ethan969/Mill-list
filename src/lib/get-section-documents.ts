@@ -16,7 +16,13 @@ export async function getSectionDocuments(
   const documents = await prisma.document.findMany({
     where: { projectId: project.id, section },
     orderBy: { order: "asc" },
-    select: { id: true, title: true, pageCount: true },
+    select: {
+      id: true,
+      title: true,
+      pageCount: true,
+      pageWidth: true,
+      pageHeight: true,
+    },
   });
 
   return { projectId: project.id, documents };

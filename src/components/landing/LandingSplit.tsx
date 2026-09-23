@@ -1,3 +1,4 @@
+import Image from "next/image";
 import PasswordGateForm from "@/components/PasswordGateForm";
 import BrandMark from "@/components/landing/BrandMark";
 import type { LandingProject } from "@/components/landing/types";
@@ -12,11 +13,13 @@ export default function LandingSplit({
       <div className="relative h-64 w-full shrink-0 overflow-hidden bg-surface md:h-auto md:w-1/2">
         {project.hasPoster ? (
           <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={`/api/projects/${project.slug}/poster`}
               alt=""
-              className="h-full w-full object-cover"
+              fill
+              priority
+              sizes="(min-width: 768px) 50vw, 100vw"
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background/40 via-transparent to-transparent md:bg-gradient-to-r" />
           </>

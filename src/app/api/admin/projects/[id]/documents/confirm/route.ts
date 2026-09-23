@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { headObject } from "@/lib/storage";
+import { headObject, getObjectBuffer } from "@/lib/storage";
 import { createDocumentRecord } from "@/lib/documents";
+import { getPdfPageSize } from "@/lib/pdf-dimensions";
 import { DOCUMENT_SECTIONS } from "@/lib/sections";
 import { DOCUMENT_MIME_TYPES } from "@/lib/upload-limits";
 import type { DocumentSection } from "@prisma/client";
@@ -53,6 +54,11 @@ export async function POST(
     );
   }
 
+  // Read the file back once to measure its page size, so the viewer can
+  // reserve the right aspect ratio up front instead of shifting layout
+  // once it loads. A one-time cost at confirm time, not per view.
+  const pageSize = await getPdfPageSize(await getObjectBuffer(key));
+
   const document = await createDocumentRecord({
     projectId: id,
     section: section as DocumentSection,
@@ -61,6 +67,8 @@ export async function POST(
     mimeType: contentType,
     fileSize: stat.size,
     fileKey: key,
+    pageWidth: pageSize?.width,
+    pageHeight: pageSize?.height,
   });
 
   return NextResponse.json({ document }, { status: 201 });

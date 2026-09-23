@@ -19,6 +19,8 @@ type DocSummary = {
   id: string;
   title: string;
   pageCount: number | null;
+  pageWidth: number | null;
+  pageHeight: number | null;
 };
 
 export default function DocumentSectionView({
@@ -67,6 +69,8 @@ export default function DocumentSectionView({
       <FlickBook
         key={active.id}
         fileUrl={`/api/documents/${active.id}/file`}
+        pdfWidth={active.pageWidth}
+        pdfHeight={active.pageHeight}
       />
 
       {downloadTarget && (

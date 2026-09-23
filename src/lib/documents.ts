@@ -10,6 +10,8 @@ export async function createDocumentRecord(params: {
   mimeType: string;
   fileSize: number;
   fileKey: string;
+  pageWidth?: number | null;
+  pageHeight?: number | null;
 }) {
   const finalTitle =
     params.title && params.title.trim().length > 0
@@ -30,6 +32,8 @@ export async function createDocumentRecord(params: {
       fileName: params.fileName,
       mimeType: params.mimeType,
       fileSize: params.fileSize,
+      pageWidth: params.pageWidth ?? null,
+      pageHeight: params.pageHeight ?? null,
       order: (maxOrder._max.order ?? -1) + 1,
     },
   });
