@@ -11,6 +11,7 @@
     "postinstall": "node scripts/copy-pdf-worker.mjs && prisma generate",
     "seed:admin": "tsx prisma/seed-admin.ts",
     "backfill:document-dimensions": "tsx prisma/backfill-document-dimensions.ts",
+    "reset-admin-2fa": "tsx prisma/reset-admin-2fa.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy"
   },
