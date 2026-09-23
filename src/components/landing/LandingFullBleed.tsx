@@ -1,6 +1,6 @@
-import Image from "next/image";
 import PasswordGateForm from "@/components/PasswordGateForm";
 import BrandMark from "@/components/landing/BrandMark";
+import PosterImage from "@/components/landing/PosterImage";
 import type { LandingProject } from "@/components/landing/types";
 
 export default function LandingFullBleed({
@@ -12,13 +12,10 @@ export default function LandingFullBleed({
     <div className="relative isolate flex flex-1 flex-col justify-end">
       {project.hasPoster && (
         <div className="absolute inset-0 -z-10">
-          <Image
-            src={`/api/projects/${project.slug}/poster`}
-            alt=""
-            fill
-            priority
+          <PosterImage
+            slug={project.slug}
             sizes="100vw"
-            className="object-cover"
+            className="h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
         </div>

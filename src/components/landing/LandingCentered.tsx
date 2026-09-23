@@ -1,6 +1,6 @@
-import Image from "next/image";
 import PasswordGateForm from "@/components/PasswordGateForm";
 import BrandMark from "@/components/landing/BrandMark";
+import PosterImage from "@/components/landing/PosterImage";
 import type { LandingProject } from "@/components/landing/types";
 
 export default function LandingCentered({
@@ -12,13 +12,10 @@ export default function LandingCentered({
     <div className="relative isolate flex flex-1 flex-col overflow-hidden">
       {project.hasPoster && (
         <div className="absolute inset-0 -z-20 overflow-hidden">
-          <Image
-            src={`/api/projects/${project.slug}/poster`}
-            alt=""
-            fill
-            priority
+          <PosterImage
+            slug={project.slug}
             sizes="100vw"
-            className="animate-kenburns scale-110 object-cover opacity-60"
+            className="animate-kenburns h-full w-full scale-110 object-cover opacity-60"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/35 via-background/55 to-background" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/45" />

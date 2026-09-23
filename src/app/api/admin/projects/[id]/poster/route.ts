@@ -1,7 +1,14 @@
+import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { putObject, deleteObject, buildAssetKey } from "@/lib/storage";
+import {
+  POSTER_WIDTHS,
+  POSTER_FORMATS,
+  posterVariantHeight,
+  posterVariantKey,
+} from "@/lib/poster-variants";
 
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 
@@ -35,6 +42,34 @@ export async function POST(
   if (project.posterKey && project.posterKey !== key) {
     await deleteObject(project.posterKey).catch(() => {});
   }
+
+  // Generate AVIF/WebP variants at each breakpoint for the responsive
+  // <picture> on the landing page. Best-effort: a variant failing to
+  // generate (e.g. an unusual source format) shouldn't fail the upload —
+  // the public poster route falls back to the original for any variant
+  // that isn't there.
+  await Promise.all(
+    POSTER_WIDTHS.flatMap((width) =>
+      POSTER_FORMATS.map(async (format) => {
+        try {
+          const variant = await sharp(buffer)
+            .resize(width, posterVariantHeight(width), {
+              fit: "cover",
+              position: sharp.strategy.attention,
+            })
+            .toFormat(format, { quality: 70 })
+            .toBuffer();
+          await putObject(
+            posterVariantKey(project.id, width, format),
+            variant,
+            `image/${format}`
+          );
+        } catch (err) {
+          console.error(`Failed to generate ${format} poster variant at ${width}px:`, err);
+        }
+      })
+    )
+  );
 
   const updated = await prisma.project.update({
     where: { id },
