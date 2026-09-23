@@ -7,6 +7,7 @@
     "build": "prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "postinstall": "node scripts/copy-pdf-worker.mjs && prisma generate",
     "seed:admin": "tsx prisma/seed-admin.ts",
     "backfill:document-dimensions": "tsx prisma/backfill-document-dimensions.ts",
@@ -38,6 +39,7 @@
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

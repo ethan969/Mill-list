@@ -1,46 +1,68 @@
-import "server-only";
+import { prisma } from "@/lib/db";
 
 /**
- * Minimal in-memory rate limiter for password attempts. Good enough to slow
- * down casual brute-forcing on a single-instance deployment; if you run
- * multiple server instances behind a load balancer, swap this for a shared
- * store (e.g. Redis) keyed the same way.
+ * Postgres-backed rate limiter for password attempts (admin login, room
+ * password entry). Fixed 10-minute window, 8 attempts, keyed by caller
+ * (e.g. "admin-login:<ip>", "room:<slug>:<ip>"). Backed by the
+ * RateLimitAttempt table specifically so this holds across Vercel's
+ * separate serverless instances — a module-level in-memory Map (the
+ * previous implementation) only holds within a single instance, which on
+ * a serverless host doesn't meaningfully rate-limit anything.
  */
 
-const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-const MAX_ATTEMPTS = 8;
+export const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+export const MAX_ATTEMPTS = 8;
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-export function checkRateLimit(key: string): { allowed: boolean; retryAfterSeconds: number } {
-  const now = Date.now();
-  const entry = attempts.get(key);
+export async function checkRateLimit(
+  key: string
+): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  const now = new Date();
+  const entry = await prisma.rateLimitAttempt.findUnique({ where: { key } });
 
   if (!entry || entry.resetAt < now) {
-    attempts.set(key, { count: 0, resetAt: now + WINDOW_MS });
+    // No window yet, or the previous one has lapsed — start a fresh one.
+    // (Mirrors the original in-memory behavior of eagerly creating an
+    // entry on the first check, before any attempt is recorded.)
+    await prisma.rateLimitAttempt.upsert({
+      where: { key },
+      create: { key, count: 0, resetAt: new Date(now.getTime() + WINDOW_MS) },
+      update: { count: 0, resetAt: new Date(now.getTime() + WINDOW_MS) },
+    });
     return { allowed: true, retryAfterSeconds: 0 };
   }
 
   if (entry.count >= MAX_ATTEMPTS) {
     return {
       allowed: false,
-      retryAfterSeconds: Math.ceil((entry.resetAt - now) / 1000),
+      retryAfterSeconds: Math.ceil((entry.resetAt.getTime() - now.getTime()) / 1000),
     };
   }
 
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
-export function recordAttempt(key: string) {
-  const now = Date.now();
-  const entry = attempts.get(key);
+export async function recordAttempt(key: string): Promise<void> {
+  const now = new Date();
+  const entry = await prisma.rateLimitAttempt.findUnique({ where: { key } });
+
   if (!entry || entry.resetAt < now) {
-    attempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+    await prisma.rateLimitAttempt.upsert({
+      where: { key },
+      create: { key, count: 1, resetAt: new Date(now.getTime() + WINDOW_MS) },
+      update: { count: 1, resetAt: new Date(now.getTime() + WINDOW_MS) },
+    });
     return;
   }
-  entry.count += 1;
+
+  // Atomic at the database level (a single UPDATE ... SET count = count +
+  // 1), so concurrent requests for the same key don't lose increments the
+  // way a naive read-modify-write would.
+  await prisma.rateLimitAttempt.update({
+    where: { key },
+    data: { count: { increment: 1 } },
+  });
 }
 
-export function clearAttempts(key: string) {
-  attempts.delete(key);
+export async function clearAttempts(key: string): Promise<void> {
+  await prisma.rateLimitAttempt.deleteMany({ where: { key } });
 }

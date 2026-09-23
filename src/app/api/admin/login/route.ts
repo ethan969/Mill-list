@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const ip = clientIp(request) ?? "unknown";
   const rateKey = `admin-login:${ip}`;
 
-  const rate = checkRateLimit(rateKey);
+  const rate = await checkRateLimit(rateKey);
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again shortly." },
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   const admin = await prisma.adminUser.findUnique({ where: { email } });
   if (!admin) {
-    recordAttempt(rateKey);
+    await recordAttempt(rateKey);
     return NextResponse.json(
       { error: "Incorrect email or password." },
       { status: 401 }
@@ -43,14 +43,14 @@ export async function POST(request: NextRequest) {
 
   const valid = await verifyPassword(password, admin.passwordHash);
   if (!valid) {
-    recordAttempt(rateKey);
+    await recordAttempt(rateKey);
     return NextResponse.json(
       { error: "Incorrect email or password." },
       { status: 401 }
     );
   }
 
-  clearAttempts(rateKey);
+  await clearAttempts(rateKey);
   await createAdminSession(admin.id, admin.email);
 
   return NextResponse.json({ ok: true });
