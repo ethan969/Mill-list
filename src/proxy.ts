@@ -16,15 +16,27 @@ async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
   }
 }
 
+const ADMIN_API_2FA_EXEMPT = new Set([
+  "/api/admin/login",
+  "/api/admin/seed",
+  "/api/admin/2fa/setup",
+  "/api/admin/2fa/confirm",
+  "/api/admin/2fa/verify",
+]);
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
+    // Sign-in and its 2FA follow-up screens: reachable before a full admin
+    // session exists (that's the point of them). Each of the 2FA API
+    // routes checks the short-lived pending-2FA session itself.
     pathname === "/admin/login" ||
-    pathname === "/api/admin/login" ||
-    pathname === "/api/admin/seed"
+    pathname === "/admin/login/setup-2fa" ||
+    pathname === "/admin/login/verify-2fa" ||
+    ADMIN_API_2FA_EXEMPT.has(pathname)
   ) {
-    // /api/admin/seed has its own gate (a token compared against
+    // /api/admin/seed has its own separate gate (a token compared against
     // SESSION_SECRET, in the route handler itself) — it must be reachable
     // before an admin session exists, since it's what creates the first one.
     return NextResponse.next();

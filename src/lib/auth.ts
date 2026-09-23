@@ -12,7 +12,9 @@ if (!secretValue || secretValue.length < 16) {
 const secret = new TextEncoder().encode(secretValue);
 
 const ADMIN_COOKIE = "admin_session";
-const ADMIN_TTL_SECONDS = 60 * 60 * 8; // 8 hours
+const ADMIN_TTL_SECONDS = 60 * 60 * 12; // 12 hours
+const PENDING_2FA_COOKIE = "admin_2fa_pending";
+const PENDING_2FA_TTL_SECONDS = 60 * 5; // 5 minutes — just long enough to enter a code
 const ROOM_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const DOWNLOAD_LINK_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
@@ -37,6 +39,17 @@ type AdminSessionPayload = {
   email: string;
 };
 
+/**
+ * Issued right after a correct password, before 2FA is checked — proves
+ * the password was right without granting admin access yet. Deliberately
+ * short-lived and never accepted by requireAdmin()/proxy.ts.
+ */
+type PendingTwoFactorPayload = {
+  kind: "admin-pending-2fa";
+  sub: string;
+  email: string;
+};
+
 type RoomSessionPayload = {
   kind: "room";
   projectId: string;
@@ -51,7 +64,11 @@ type DownloadLinkPayload = {
 };
 
 async function sign(
-  payload: AdminSessionPayload | RoomSessionPayload | DownloadLinkPayload,
+  payload:
+    | AdminSessionPayload
+    | PendingTwoFactorPayload
+    | RoomSessionPayload
+    | DownloadLinkPayload,
   ttlSeconds: number
 ): Promise<string> {
   return new SignJWT({ ...payload })
@@ -101,6 +118,37 @@ export async function destroyAdminSession() {
 /** For API routes: returns the admin session, or null if not authenticated. */
 export async function requireAdmin(): Promise<AdminSessionPayload | null> {
   return getAdminSession();
+}
+
+// ---- Pending 2FA sessions (between password check and code check) ----
+
+export async function createPendingTwoFactorSession(sub: string, email: string) {
+  const token = await sign(
+    { kind: "admin-pending-2fa", sub, email },
+    PENDING_2FA_TTL_SECONDS
+  );
+  const store = await cookies();
+  store.set(PENDING_2FA_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: PENDING_2FA_TTL_SECONDS,
+  });
+}
+
+export async function getPendingTwoFactorSession(): Promise<PendingTwoFactorPayload | null> {
+  const store = await cookies();
+  const token = store.get(PENDING_2FA_COOKIE)?.value;
+  if (!token) return null;
+  const payload = await verify<PendingTwoFactorPayload>(token);
+  if (!payload || payload.kind !== "admin-pending-2fa") return null;
+  return payload;
+}
+
+export async function destroyPendingTwoFactorSession() {
+  const store = await cookies();
+  store.delete(PENDING_2FA_COOKIE);
 }
 
 // ---- Data room sessions (per project) ----

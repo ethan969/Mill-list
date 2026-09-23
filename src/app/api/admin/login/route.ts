@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, createAdminSession } from "@/lib/auth";
+import { verifyPassword, createPendingTwoFactorSession } from "@/lib/auth";
 import { checkRateLimit, recordAttempt, clearAttempts } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/leads";
 
@@ -51,7 +51,15 @@ export async function POST(request: NextRequest) {
   }
 
   await clearAttempts(rateKey);
-  await createAdminSession(admin.id, admin.email);
 
-  return NextResponse.json({ ok: true });
+  // Password is correct, but that alone no longer grants admin access —
+  // a pending session proves it without creating a real one, and the
+  // client is told whether to go set up 2FA for the first time or enter
+  // a code from an already-enrolled authenticator.
+  await createPendingTwoFactorSession(admin.id, admin.email);
+
+  return NextResponse.json({
+    ok: true,
+    next: admin.totpEnabledAt ? "verify" : "setup",
+  });
 }

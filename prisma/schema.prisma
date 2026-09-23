@@ -13,6 +13,31 @@ model AdminUser {
   passwordHash String
   name         String?
   createdAt    DateTime @default(now())
+
+  /// AES-256-GCM ciphertext (base64), decrypted with TOTP_ENCRYPTION_KEY —
+  /// see src/lib/totp.ts. Set as soon as enrollment starts; totpEnabledAt
+  /// is what actually gates whether 2FA is required at login.
+  totpSecretEncrypted String?
+  /// Null until the admin confirms enrollment with a valid code.
+  totpEnabledAt        DateTime?
+  /// The most recent TOTP time-step successfully consumed, so a code
+  /// can't be replayed within its own validity window.
+  totpLastUsedStep     Int?
+
+  recoveryCodes AdminRecoveryCode[]
+}
+
+/// Single-use 2FA recovery codes, bcrypt-hashed (never stored in plaintext,
+/// so seeing this table doesn't reveal usable codes — see src/lib/totp.ts).
+model AdminRecoveryCode {
+  id        String    @id @default(cuid())
+  adminId   String
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([adminId])
 }
 
 enum DocumentSection {
