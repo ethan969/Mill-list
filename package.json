@@ -9,6 +9,7 @@
     "lint": "eslint",
     "postinstall": "node scripts/copy-pdf-worker.mjs && prisma generate",
     "seed:admin": "tsx prisma/seed-admin.ts",
+    "backfill:document-dimensions": "tsx prisma/backfill-document-dimensions.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy"
   },
