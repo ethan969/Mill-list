@@ -1,7 +1,15 @@
-import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
+import {
+  signRoomToken,
+  verifyRoomToken,
+  roomCookieName,
+  ROOM_TTL_SECONDS,
+  type RoomSessionPayload,
+} from "@/lib/room-token";
+
+export { signRoomToken, verifyRoomToken };
 
 const secretValue = process.env.SESSION_SECRET;
 if (!secretValue || secretValue.length < 16) {
@@ -13,12 +21,9 @@ const secret = new TextEncoder().encode(secretValue);
 
 const ADMIN_COOKIE = "admin_session";
 const ADMIN_TTL_SECONDS = 60 * 60 * 8; // 8 hours
-const ROOM_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const PENDING_2FA_COOKIE = "admin_2fa_pending";
+const PENDING_2FA_TTL_SECONDS = 60 * 5; // 5 minutes — just long enough to enter a code
 const DOWNLOAD_LINK_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
-
-function roomCookieName(slug: string) {
-  return `room_${slug}`;
-}
 
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, 12);
@@ -37,10 +42,15 @@ type AdminSessionPayload = {
   email: string;
 };
 
-type RoomSessionPayload = {
-  kind: "room";
-  projectId: string;
-  slug: string;
+/**
+ * Issued right after a correct password, before 2FA is checked — proves
+ * the password was right without granting admin access yet. Deliberately
+ * short-lived and never accepted by requireAdmin()/proxy.ts.
+ */
+type PendingTwoFactorPayload = {
+  kind: "admin-pending-2fa";
+  sub: string;
+  email: string;
 };
 
 type DownloadLinkPayload = {
@@ -51,7 +61,7 @@ type DownloadLinkPayload = {
 };
 
 async function sign(
-  payload: AdminSessionPayload | RoomSessionPayload | DownloadLinkPayload,
+  payload: AdminSessionPayload | PendingTwoFactorPayload | DownloadLinkPayload,
   ttlSeconds: number
 ): Promise<string> {
   return new SignJWT({ ...payload })
@@ -103,10 +113,48 @@ export async function requireAdmin(): Promise<AdminSessionPayload | null> {
   return getAdminSession();
 }
 
-// ---- Data room sessions (per project) ----
+// ---- Pending 2FA sessions (between password check and code check) ----
 
-export async function createRoomSession(projectId: string, slug: string) {
-  const token = await sign({ kind: "room", projectId, slug }, ROOM_TTL_SECONDS);
+export async function createPendingTwoFactorSession(sub: string, email: string) {
+  const token = await sign(
+    { kind: "admin-pending-2fa", sub, email },
+    PENDING_2FA_TTL_SECONDS
+  );
+  const store = await cookies();
+  store.set(PENDING_2FA_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: PENDING_2FA_TTL_SECONDS,
+  });
+}
+
+export async function getPendingTwoFactorSession(): Promise<PendingTwoFactorPayload | null> {
+  const store = await cookies();
+  const token = store.get(PENDING_2FA_COOKIE)?.value;
+  if (!token) return null;
+  const payload = await verify<PendingTwoFactorPayload>(token);
+  if (!payload || payload.kind !== "admin-pending-2fa") return null;
+  return payload;
+}
+
+export async function destroyPendingTwoFactorSession() {
+  const store = await cookies();
+  store.delete(PENDING_2FA_COOKIE);
+}
+
+// ---- Data room sessions (per project) ----
+// signRoomToken/verifyRoomToken live in @/lib/room-token (re-exported above)
+// so they have no next/headers dependency and can be called from
+// src/proxy.ts, which runs before Next's per-request RSC cookie context.
+
+export async function createRoomSession(
+  projectId: string,
+  slug: string,
+  sessionVersion: number
+) {
+  const token = await signRoomToken(projectId, slug, sessionVersion);
   const store = await cookies();
   store.set(roomCookieName(slug), token, {
     httpOnly: true,
@@ -123,11 +171,7 @@ export async function getRoomSession(
   const store = await cookies();
   const token = store.get(roomCookieName(slug))?.value;
   if (!token) return null;
-  const payload = await verify<RoomSessionPayload>(token);
-  if (!payload || payload.kind !== "room" || payload.slug !== slug) {
-    return null;
-  }
-  return payload;
+  return verifyRoomToken(token, slug);
 }
 
 export async function destroyRoomSession(slug: string) {

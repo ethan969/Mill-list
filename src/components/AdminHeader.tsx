@@ -6,7 +6,14 @@ import { usePathname, useRouter } from "next/navigation";
 export default function AdminHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  if (pathname === "/admin/login") return null;
+  // Every pre-authentication step of the login flow (password entry, 2FA
+  // QR setup, 2FA code verification) — not just the first page of it. The
+  // "Admin" link this header renders otherwise gets prefetched by Next.js
+  // while the visitor is still on one of these pages, before any session
+  // cookie exists; that prefetch's redirect-to-login result then gets
+  // cached client-side and replayed even after a real login succeeds,
+  // bouncing the just-authenticated visitor straight back to /admin/login.
+  if (pathname.startsWith("/admin/login")) return null;
 
   async function handleSignOut() {
     await fetch("/api/admin/logout", { method: "POST" });

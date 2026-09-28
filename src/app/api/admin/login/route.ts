@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, createAdminSession } from "@/lib/auth";
+import { verifyPassword, createPendingTwoFactorSession } from "@/lib/auth";
 import { checkRateLimit, recordAttempt, clearAttempts } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/leads";
 
@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const ip = clientIp(request) ?? "unknown";
   const rateKey = `admin-login:${ip}`;
 
-  const rate = checkRateLimit(rateKey);
+  const rate = await checkRateLimit(rateKey);
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again shortly." },
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   const admin = await prisma.adminUser.findUnique({ where: { email } });
   if (!admin) {
-    recordAttempt(rateKey);
+    await recordAttempt(rateKey);
     return NextResponse.json(
       { error: "Incorrect email or password." },
       { status: 401 }
@@ -43,15 +43,23 @@ export async function POST(request: NextRequest) {
 
   const valid = await verifyPassword(password, admin.passwordHash);
   if (!valid) {
-    recordAttempt(rateKey);
+    await recordAttempt(rateKey);
     return NextResponse.json(
       { error: "Incorrect email or password." },
       { status: 401 }
     );
   }
 
-  clearAttempts(rateKey);
-  await createAdminSession(admin.id, admin.email);
+  await clearAttempts(rateKey);
 
-  return NextResponse.json({ ok: true });
+  // Password is correct, but that alone no longer grants admin access —
+  // a pending session proves it without creating a real one, and the
+  // client is told whether to go set up 2FA for the first time or enter
+  // a code from an already-enrolled authenticator.
+  await createPendingTwoFactorSession(admin.id, admin.email);
+
+  return NextResponse.json({
+    ok: true,
+    next: admin.totpEnabledAt ? "verify" : "setup",
+  });
 }

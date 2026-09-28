@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getRoomAvailability, firstAvailableSection } from "@/lib/room-availability";
+import { requireRoomAccess } from "@/lib/require-room-access";
 import EmptyState from "@/components/EmptyState";
 
 type TeamMember = { name: string; role?: string; bio?: string };
@@ -11,6 +12,7 @@ export default async function AboutPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  await requireRoomAccess(slug);
 
   const project = await prisma.project.findUnique({
     where: { slug },

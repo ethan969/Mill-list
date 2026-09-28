@@ -13,6 +13,31 @@ model AdminUser {
   passwordHash String
   name         String?
   createdAt    DateTime @default(now())
+
+  /// AES-256-GCM ciphertext (base64), decrypted with TOTP_ENCRYPTION_KEY —
+  /// see src/lib/totp.ts. Set as soon as enrollment starts; totpEnabledAt
+  /// is what actually gates whether 2FA is required at login.
+  totpSecretEncrypted String?
+  /// Null until the admin confirms enrollment with a valid code.
+  totpEnabledAt        DateTime?
+  /// The most recent TOTP time-step successfully consumed, so a code
+  /// can't be replayed within its own validity window.
+  totpLastUsedStep     Int?
+
+  recoveryCodes AdminRecoveryCode[]
+}
+
+/// Single-use 2FA recovery codes, bcrypt-hashed (never stored in plaintext,
+/// so seeing this table doesn't reveal usable codes — see src/lib/totp.ts).
+model AdminRecoveryCode {
+  id        String    @id @default(cuid())
+  adminId   String
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([adminId])
 }
 
 enum DocumentSection {
@@ -44,6 +69,11 @@ model Project {
   landingLayout     String   @default("centered")
   roomLayout        String   @default("top-nav")
   passwordHash      String
+  /// Bumped whenever the room password changes or an admin explicitly
+  /// revokes viewer sessions — every room JWT carries the version it was
+  /// issued under (src/lib/auth.ts), so bumping this invalidates every
+  /// cookie issued before the bump without needing a session store.
+  sessionVersion    Int      @default(1)
   isPublished       Boolean  @default(false)
   aboutContent      String?
   aboutTeam         Json?
@@ -124,4 +154,21 @@ model DocumentDownload {
 
   @@index([projectId])
   @@index([email])
+}
+
+/// Backs the per-key rate limiter (src/lib/rate-limit.ts) — a fixed window
+/// per key (e.g. "admin-login:<ip>", "room:<slug>:<ip>"), stored in
+/// Postgres instead of in-memory so it actually holds across Vercel's
+/// separate serverless instances. An expired row is simply treated as a
+/// fresh window on its next read (checkRateLimit), and is also deleted on
+/// a successful auth (clearAttempts). checkRateLimit additionally sweeps
+/// every already-expired row with small probability on each call
+/// (sweepExpiredAttempts) so the table doesn't grow unboundedly from keys
+/// that are never explicitly cleared — no separate cron job/route needed.
+model RateLimitAttempt {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
 }

@@ -7,9 +7,11 @@
     "build": "prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "postinstall": "node scripts/copy-pdf-worker.mjs && prisma generate",
     "seed:admin": "tsx prisma/seed-admin.ts",
     "backfill:document-dimensions": "tsx prisma/backfill-document-dimensions.ts",
+    "reset-admin-2fa": "tsx prisma/reset-admin-2fa.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy"
   },
@@ -20,8 +22,10 @@
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.12",
     "next": "16.3.5",
+    "otpauth": "^9.5.2",
     "pdf-lib": "^1.17.1",
     "prisma": "^6.19.3",
+    "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-pdf": "^10.5.0",
@@ -32,12 +36,14 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

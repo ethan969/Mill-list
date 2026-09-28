@@ -12,7 +12,7 @@ export async function POST(
   const ip = clientIp(request) ?? "unknown";
   const rateKey = `room:${slug}:${ip}`;
 
-  const rate = checkRateLimit(rateKey);
+  const rate = await checkRateLimit(rateKey);
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again shortly." },
@@ -35,18 +35,18 @@ export async function POST(
   const project = await prisma.project.findUnique({ where: { slug } });
 
   if (!project || !project.isPublished) {
-    recordAttempt(rateKey);
+    await recordAttempt(rateKey);
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
 
   const valid = await verifyPassword(password, project.passwordHash);
   if (!valid) {
-    recordAttempt(rateKey);
+    await recordAttempt(rateKey);
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
 
-  clearAttempts(rateKey);
-  await createRoomSession(project.id, project.slug);
+  await clearAttempts(rateKey);
+  await createRoomSession(project.id, project.slug, project.sessionVersion);
 
   return NextResponse.json({ ok: true });
 }

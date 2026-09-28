@@ -179,10 +179,17 @@ export async function getPresignedUploadUrl(
  * instead of proxying the whole file through this server on every open
  * (our own proxy route has no Range support, so a large document had to
  * download in full before the first page could render, on every visit).
+ *
+ * 5 minutes is deliberately short — and safe for long viewing sessions
+ * despite that, because pdf.js's range reader (PDFFetchStreamRangeReader
+ * in pdfjs-dist) re-fetches the *original* URL (our own file route, which
+ * mints a fresh presigned URL each time) for every single Range request,
+ * never a cached/resolved redirect target. So this only ever has to
+ * outlive one request's round-trip to storage, not the whole session.
  */
 export async function getPresignedDownloadUrl(
   key: string,
-  expiresInSeconds = 900
+  expiresInSeconds = 300
 ): Promise<string> {
   const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
   return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });

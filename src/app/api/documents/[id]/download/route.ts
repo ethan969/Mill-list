@@ -48,7 +48,7 @@ export async function POST(
 
   const ip = clientIp(request) ?? "unknown";
   const rateKey = `download:${document.id}:${ip}`;
-  const rate = checkRateLimit(rateKey);
+  const rate = await checkRateLimit(rateKey);
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again shortly." },
@@ -65,7 +65,7 @@ export async function POST(
 
   const parsed = emailSchema.safeParse(body.email);
   if (!parsed.success) {
-    recordAttempt(rateKey);
+    await recordAttempt(rateKey);
     return NextResponse.json(
       { error: "Enter a valid email address." },
       { status: 400 }

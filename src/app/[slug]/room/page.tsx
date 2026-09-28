@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { redirect } from "next/navigation";
 import { getRoomAvailability, firstAvailableSection } from "@/lib/room-availability";
+import { requireRoomAccess } from "@/lib/require-room-access";
 import EmptyState from "@/components/EmptyState";
 
 export default async function RoomIndexPage({
@@ -9,14 +9,9 @@ export default async function RoomIndexPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const { projectId } = await requireRoomAccess(slug);
 
-  const project = await prisma.project.findUnique({
-    where: { slug },
-    select: { id: true },
-  });
-  if (!project) notFound();
-
-  const availability = await getRoomAvailability(project.id);
+  const availability = await getRoomAvailability(projectId);
   const first = firstAvailableSection(availability);
 
   if (first) {

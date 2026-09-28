@@ -27,8 +27,9 @@ export default function AdminLoginPage() {
         setLoading(false);
         return;
       }
-      router.push("/admin");
-      router.refresh();
+      router.push(
+        data.next === "setup" ? "/admin/login/setup-2fa" : "/admin/login/verify-2fa"
+      );
     } catch {
       setError("Network error. Try again.");
       setLoading(false);

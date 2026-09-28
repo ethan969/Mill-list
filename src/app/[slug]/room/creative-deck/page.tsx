@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSectionDocuments } from "@/lib/get-section-documents";
 import { getRoomAvailability, firstAvailableSection } from "@/lib/room-availability";
+import { requireRoomAccess } from "@/lib/require-room-access";
 import DocumentSectionView from "@/components/DocumentSectionView";
 import EmptyState from "@/components/EmptyState";
 
@@ -10,6 +11,7 @@ export default async function CreativeDeckPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  await requireRoomAccess(slug);
   const { projectId, documents } = await getSectionDocuments(slug, "CREATIVE_DECK");
 
   if (documents.length === 0) {
