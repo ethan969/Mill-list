@@ -1,11 +1,16 @@
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { getRoomSession } from "@/lib/auth";
+import { canAccessProjectFromCookieStore } from "@/lib/auth";
 
 /**
  * Confirms room access and returns the project id — call this as the
  * very first thing in every room section page, before any other data
  * fetching.
+ *
+ * Accepts either a room session for this project directly, or a slate
+ * session for a slate that currently includes it — a slate visitor
+ * reaches these same room pages via direct links, authorized by their
+ * slate cookie rather than a separate room password (see @/lib/access).
  *
  * The room layout (src/app/[slug]/room/layout.tsx) already does this
  * same check, but Next.js can render/fetch a page's own Server Component
@@ -27,8 +32,8 @@ export async function requireRoomAccess(slug: string): Promise<{ projectId: stri
   });
   if (!project || !project.isPublished) notFound();
 
-  const session = await getRoomSession(slug);
-  if (!session || session.projectId !== project.id) {
+  const allowed = await canAccessProjectFromCookieStore(project.id);
+  if (!allowed) {
     redirect(`/${slug}`);
   }
 

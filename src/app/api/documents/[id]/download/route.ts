@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyRoomAccessForProject, createDownloadToken } from "@/lib/auth";
+import { createDownloadToken } from "@/lib/auth";
+import { resolveDocumentAccess } from "@/lib/access";
 import { recordDownload, clientIp } from "@/lib/leads";
 import { sendDownloadLinkEmail } from "@/lib/email";
 import { emailSchema } from "@/lib/validation";
@@ -24,30 +25,42 @@ export async function POST(
       project: {
         select: {
           id: true,
-          slug: true,
           title: true,
           productionCompany: true,
           themeId: true,
           accentColor: true,
         },
       },
+      slate: {
+        select: { id: true, title: true, themeId: true, accentColor: true },
+      },
     },
   });
 
-  // TODO(slate-mode commit 2): route through canAccessDocument(), which
-  // will also accept a slate session for a slate-level document (no
-  // project at all) or a project document reached via slate membership.
-  if (!document || !document.project) {
+  if (!document) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  const allowed = await verifyRoomAccessForProject(
-    document.project.slug,
-    document.project.id
-  );
-  if (!allowed) {
+  const access = await resolveDocumentAccess(request, document.id);
+  if (!access.ok) {
     return NextResponse.json({ error: "Access denied." }, { status: 403 });
   }
+
+  // Exactly one of these is set — enforced at the database level (see the
+  // slate-mode migration's CHECK constraint on Document).
+  const owner = document.project
+    ? {
+        title: document.project.title,
+        productionCompany: document.project.productionCompany,
+        themeId: document.project.themeId,
+        accentColor: document.project.accentColor,
+      }
+    : {
+        title: document.slate!.title,
+        productionCompany: "Slate",
+        themeId: document.slate!.themeId,
+        accentColor: document.slate!.accentColor,
+      };
 
   const ip = clientIp(request) ?? "unknown";
   const rateKey = `download:${document.id}:${ip}`;
@@ -84,7 +97,8 @@ export async function POST(
   }
 
   const download = await recordDownload({
-    projectId: document.project.id,
+    projectId: access.projectId,
+    slateId: access.slateId,
     documentId: document.id,
     email,
     request,
@@ -99,14 +113,14 @@ export async function POST(
   const origin = APP_URL || request.nextUrl.origin;
   const downloadUrl = `${origin}/api/documents/${document.id}/download/link?token=${encodeURIComponent(token)}`;
 
-  const theme = getTheme(document.project.themeId);
-  const accentColor = document.project.accentColor || theme.colors.accent;
+  const theme = getTheme(owner.themeId);
+  const accentColor = owner.accentColor || theme.colors.accent;
 
   try {
     const result = await sendDownloadLinkEmail({
       to: email,
-      projectTitle: document.project.title,
-      productionCompany: document.project.productionCompany,
+      projectTitle: owner.title,
+      productionCompany: owner.productionCompany,
       documentTitle: document.title,
       downloadUrl,
       accentColor,

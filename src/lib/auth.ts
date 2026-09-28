@@ -8,8 +8,16 @@ import {
   ROOM_TTL_SECONDS,
   type RoomSessionPayload,
 } from "@/lib/room-token";
+import {
+  signSlateToken,
+  verifySlateToken,
+  slateCookieName,
+  SLATE_TTL_SECONDS,
+  type SlateSessionPayload,
+} from "@/lib/slate-token";
+import { projectAccessFromCookies } from "@/lib/access";
 
-export { signRoomToken, verifyRoomToken };
+export { signRoomToken, verifyRoomToken, signSlateToken, verifySlateToken };
 
 const secretValue = process.env.SESSION_SECRET;
 if (!secretValue || secretValue.length < 16) {
@@ -190,6 +198,55 @@ export async function verifyRoomAccessForProject(
 ): Promise<boolean> {
   const session = await getRoomSession(slug);
   return Boolean(session && session.projectId === projectId);
+}
+
+// ---- Slate sessions (per curated collection of projects) ----
+// signSlateToken/verifySlateToken live in @/lib/slate-token, same reason
+// as the room ones: no next/headers dependency, so proxy.ts can use them.
+
+export async function createSlateSession(
+  slateId: string,
+  slug: string,
+  sessionVersion: number
+) {
+  const token = await signSlateToken(slateId, slug, sessionVersion);
+  const store = await cookies();
+  store.set(slateCookieName(slug), token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SLATE_TTL_SECONDS,
+  });
+}
+
+export async function getSlateSession(
+  slug: string
+): Promise<SlateSessionPayload | null> {
+  const store = await cookies();
+  const token = store.get(slateCookieName(slug))?.value;
+  if (!token) return null;
+  return verifySlateToken(token, slug);
+}
+
+export async function destroySlateSession(slug: string) {
+  const store = await cookies();
+  store.delete(slateCookieName(slug));
+}
+
+/**
+ * The Server Component equivalent of @/lib/access's canAccessProject — same
+ * check (a valid room cookie for this project, or a valid slate cookie for
+ * a slate that currently includes it), but reading from next/headers's
+ * ambient cookies() store instead of a NextRequest, since pages and
+ * layouts don't have one. Used by requireRoomAccess() and the room layout.
+ */
+export async function canAccessProjectFromCookieStore(
+  projectId: string
+): Promise<boolean> {
+  const store = await cookies();
+  const entries = store.getAll().map((c) => ({ name: c.name, value: c.value }));
+  return projectAccessFromCookies(entries, projectId);
 }
 
 // ---- Emailed download links ----

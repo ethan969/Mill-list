@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { getRoomSession } from "@/lib/auth";
+import { canAccessProjectFromCookieStore } from "@/lib/auth";
 import { getRoomAvailability } from "@/lib/room-availability";
 import RoomNav from "@/components/RoomNav";
 import RoomSidebar from "@/components/RoomSidebar";
@@ -28,8 +28,8 @@ export default async function RoomLayout({
 
   if (!project || !project.isPublished) notFound();
 
-  const session = await getRoomSession(slug);
-  if (!session || session.projectId !== project.id) {
+  const allowed = await canAccessProjectFromCookieStore(project.id);
+  if (!allowed) {
     redirect(`/${slug}`);
   }
 

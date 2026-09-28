@@ -34,18 +34,20 @@ export async function GET(
       fileKey: true,
       mimeType: true,
       project: { select: { title: true } },
+      slate: { select: { title: true } },
     },
   });
-  // TODO(slate-mode commit 2): a slate-level document has no project — the
-  // watermark's projectTitle will need a slate-title fallback there.
-  if (!document || document.mimeType !== "application/pdf" || !document.project) {
+  if (!document || document.mimeType !== "application/pdf") {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
+
+  // Exactly one of these is set — enforced at the database level.
+  const ownerTitle = document.project?.title ?? document.slate!.title;
 
   const original = await getObjectBuffer(document.fileKey);
   const watermarked = await watermarkPdf(original, {
     email: payload.email,
-    projectTitle: document.project.title,
+    projectTitle: ownerTitle,
   });
 
   await prisma.documentDownload
