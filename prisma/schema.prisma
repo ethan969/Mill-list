@@ -84,14 +84,69 @@ model Project {
   gallery    GalleryItem[]
   references ReferenceLink[]
   downloads  DocumentDownload[]
+  slates     SlateProject[]
 
   @@index([slug])
 }
 
-model Document {
-  id        String          @id @default(cuid())
+/// A curated, password-protected collection of existing Projects, browsable
+/// (and its own slate-level documents downloadable) under one shared
+/// password — see src/lib/access.ts for how a slate session additionally
+/// unlocks each member project's own room pages via live membership checks,
+/// rather than duplicating each project's own password.
+model Slate {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  overview       String?
+  themeId        String   @default("midnight-gold")
+  accentColor    String?
+  fontId         String?
+  passwordHash   String
+  /// Same invalidation pattern as Project.sessionVersion — bumped on a
+  /// password change or an explicit revoke; every slate JWT carries the
+  /// version it was issued under (src/lib/slate-token.ts).
+  sessionVersion Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  projects  SlateProject[]
+  documents Document[]
+  downloads DocumentDownload[]
+
+  @@index([slug])
+}
+
+/// Which Projects a Slate currently includes, and in what order to list
+/// them — membership is checked live against this table on every request
+/// (src/lib/access.ts), not baked into the slate session token, so
+/// removing a film from a slate takes effect immediately for anyone
+/// already holding a valid slate cookie.
+model SlateProject {
+  id        String   @id @default(cuid())
+  slateId   String
+  slate     Slate    @relation(fields: [slateId], references: [id], onDelete: Cascade)
   projectId String
-  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([slateId, projectId])
+  @@index([slateId])
+  @@index([projectId])
+}
+
+/// A document belongs to exactly one of a Project (its room) or a Slate
+/// (a slate-level document, e.g. an overview deck not tied to one film) —
+/// enforced by a database CHECK constraint added by this model's migration
+/// (Prisma's schema DSL doesn't express arbitrary CHECK constraints, so
+/// it's appended as raw SQL there) rather than by application code alone.
+model Document {
+  id        String           @id @default(cuid())
+  projectId String?
+  project   Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slateId   String?
+  slate     Slate?           @relation(fields: [slateId], references: [id], onDelete: Cascade)
   section   DocumentSection
   title     String
   fileKey   String
@@ -108,6 +163,7 @@ model Document {
   downloads DocumentDownload[]
 
   @@index([projectId, section])
+  @@index([slateId, section])
 }
 
 model GalleryItem {
@@ -138,21 +194,30 @@ model ReferenceLink {
 }
 
 /// Recorded each time someone provides their email to receive a
-/// watermarked copy of a document from the data room by email.
+/// watermarked copy of a document from the data room by email. projectId
+/// is nullable (unlike before) because a slate-level document has no
+/// project to record — but projectId and slateId are NOT mutually
+/// exclusive the way they are on Document: downloading a project-owned
+/// document via a slate session records both (which project's document,
+/// and which slate the access came through), while downloading a
+/// slate-level document records only slateId.
 model DocumentDownload {
-  id         String   @id @default(cuid())
-  projectId  String
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  projectId  String?
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slateId    String?
+  slate      Slate?    @relation(fields: [slateId], references: [id], onDelete: Cascade)
   documentId String
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
   email      String
-  emailSent  Boolean  @default(false)
-  linkOpened Boolean  @default(false)
+  emailSent  Boolean   @default(false)
+  linkOpened Boolean   @default(false)
   ip         String?
   userAgent  String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([projectId])
+  @@index([slateId])
   @@index([email])
 }
 

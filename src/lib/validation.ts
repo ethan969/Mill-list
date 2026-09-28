@@ -14,7 +14,12 @@ export const emailSchema = z
   .email("Enter a valid email address")
   .max(254);
 
-export const slugSchema = z
+// Top-level path segments a project slug would otherwise collide with —
+// "slate" is its own route namespace (/slate/[slug], parallel to a
+// project's own /[slug]), so a project can't claim it as a slug.
+const RESERVED_PROJECT_SLUGS = new Set(["slate"]);
+
+const baseSlugSchema = z
   .string()
   .trim()
   .toLowerCase()
@@ -24,6 +29,16 @@ export const slugSchema = z
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
     "Use lowercase letters, numbers and hyphens only"
   );
+
+export const slugSchema = baseSlugSchema.refine(
+  (v) => !RESERVED_PROJECT_SLUGS.has(v),
+  "That URL slug is reserved"
+);
+
+// A slate's own slug lives under /slate/[slug] — a different namespace
+// than project slugs, so it has no reason to reserve "slate" against
+// itself.
+export const slateSlugSchema = baseSlugSchema;
 
 export const roomPasswordSchema = z.string().min(4).max(200);
 
@@ -77,3 +92,27 @@ export const referenceLinkSchema = z.object({
   label: z.string().trim().min(1).max(200),
   url: z.string().trim().url().max(2000),
 });
+
+export const slateCreateSchema = z.object({
+  slug: slateSlugSchema,
+  title: z.string().trim().min(1).max(200),
+  overview: z.string().trim().max(20000).optional().or(z.literal("")),
+  themeId: z
+    .string()
+    .refine((v) => THEME_IDS.includes(v), "Unknown theme")
+    .optional(),
+  fontId: z
+    .string()
+    .refine((v) => FONT_IDS.includes(v), "Unknown font")
+    .optional()
+    .or(z.literal("")),
+  accentColor: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional()
+    .or(z.literal("")),
+  password: roomPasswordSchema,
+});
+
+export const slateUpdateSchema = slateCreateSchema.partial();

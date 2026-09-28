@@ -36,7 +36,9 @@ export async function GET(
       project: { select: { title: true } },
     },
   });
-  if (!document || document.mimeType !== "application/pdf") {
+  // TODO(slate-mode commit 2): a slate-level document has no project — the
+  // watermark's projectTitle will need a slate-title fallback there.
+  if (!document || document.mimeType !== "application/pdf" || !document.project) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 

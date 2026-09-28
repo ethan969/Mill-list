@@ -34,7 +34,10 @@ export async function POST(
     },
   });
 
-  if (!document) {
+  // TODO(slate-mode commit 2): route through canAccessDocument(), which
+  // will also accept a slate session for a slate-level document (no
+  // project at all) or a project document reached via slate membership.
+  if (!document || !document.project) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
