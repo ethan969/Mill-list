@@ -68,6 +68,9 @@ let slug: string;
 let projectId: string;
 let secrets: string[];
 let secretDocTitles: Record<string, string>;
+let slateId: string;
+let slateSlug: string;
+const SLATE_PASSWORD = "slate-integration-test-password";
 
 beforeAll(async () => {
   slug = `room-gate-test-${crypto.randomUUID()}`;
@@ -119,6 +122,18 @@ beforeAll(async () => {
     data: { projectId, label: secretReference, url: "https://example.com/secret" },
   });
 
+  slateSlug = `slate-gate-test-${crypto.randomUUID()}`;
+  const bcrypt = (await import("bcryptjs")).default;
+  const slate = await prisma.slate.create({
+    data: {
+      slug: slateSlug,
+      title: `Secret Slate ${rand}`,
+      passwordHash: await bcrypt.hash(SLATE_PASSWORD, 12),
+    },
+  });
+  slateId = slate.id;
+  await prisma.slateProject.create({ data: { slateId, projectId } });
+
   secrets = [secretAbout, secretBio, secretCaption, secretReference, ...Object.values(secretDocTitles)];
 
   // Build fresh so the server under test reflects the current source tree,
@@ -156,6 +171,10 @@ afterAll(async () => {
       // Already gone.
     }
   }
+  // Slate delete cascades to its SlateProject membership row and its own
+  // slate-level document; must run before the project delete below, since
+  // SlateProject also references projectId.
+  await prisma.slate.delete({ where: { id: slateId } }).catch(() => {});
   await prisma.project.delete({ where: { id: projectId } }).catch(() => {});
 });
 
@@ -243,5 +262,45 @@ describe("proxy room gate: every room route, three invalid-session states", () =
 
     const body = await res.text();
     expect(body).toContain(secretDocTitles.SCRIPT);
+  });
+});
+
+describe("slate access via a real server (the one case that can't be unit-tested)", () => {
+  // src/lib/access.test.ts covers member/non-member/removed/revoked/
+  // cross-slate/expired/tampered at the function level directly — the one
+  // thing that can't be tested that way is a successful login, since
+  // createSlateSession() calls next/headers's cookies(), which only works
+  // inside a real Next.js request. This exercises that through the actual
+  // running server, then confirms the resulting cookie opens the member
+  // project's room page with real, authenticated content.
+  it("a correct slate password sets a cookie that opens the member project's room", async () => {
+    const authRes = await fetch(`${BASE_URL}/api/slate/${slateSlug}/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: SLATE_PASSWORD }),
+    });
+    expect(authRes.status).toBe(200);
+
+    const setCookie = authRes.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain(`slate_${slateSlug}=`);
+    const cookieValue = setCookie.split(";")[0];
+
+    const roomRes = await fetch(`${BASE_URL}/${slug}/room/script`, {
+      redirect: "manual",
+      headers: { cookie: cookieValue! },
+    });
+    expect(roomRes.status).toBe(200);
+    const body = await roomRes.text();
+    expect(body).toContain(secretDocTitles.SCRIPT);
+  });
+
+  it("a wrong slate password is rejected with no cookie set", async () => {
+    const authRes = await fetch(`${BASE_URL}/api/slate/${slateSlug}/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "wrong-password" }),
+    });
+    expect(authRes.status).toBe(401);
+    expect(authRes.headers.get("set-cookie")).toBeNull();
   });
 });
