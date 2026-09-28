@@ -151,6 +151,17 @@ export function buildAssetKey(
   return `projects/${projectId}/${category}/${id}${ext}`;
 }
 
+/** Build a storage key for a newly uploaded slate-level asset. */
+export function buildSlateAssetKey(
+  slateId: string,
+  category: string,
+  id: string,
+  fileName: string
+): string {
+  const ext = path.extname(fileName) || "";
+  return `slates/${slateId}/${category}/${id}${ext}`;
+}
+
 /**
  * A short-lived URL the browser can PUT a file to directly, bypassing our
  * server entirely for the file bytes — the only way to accept files larger
