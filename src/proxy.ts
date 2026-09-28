@@ -74,7 +74,16 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const roomMatch = pathname.match(/^\/([^/]+)\/room(?:\/|$)/);
+  // Room *pages* only, never API routes — a pathname like
+  // /api/room/<slug>/auth structurally matches the same "/<segment>/room/…"
+  // shape (with "api" standing in for the slug), which would otherwise
+  // make this gate wrongly intercept the room password login/logout API
+  // itself and redirect it before it ever runs. Those routes already do
+  // their own auth (the login route *is* the auth check; logout needs
+  // none) — they were never meant to go through this check at all.
+  const roomMatch = !pathname.startsWith("/api/")
+    ? pathname.match(/^\/([^/]+)\/room(?:\/|$)/)
+    : null;
   if (roomMatch) {
     const slug = roomMatch[1];
     const ok = await hasValidRoomSession(request, slug);
