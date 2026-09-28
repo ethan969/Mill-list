@@ -70,12 +70,10 @@ const nextConfig: NextConfig = {
             value: "max-age=31536000; includeSubDomains",
           },
           {
-            // Real, enforced clickjacking protection from day one. The
-            // equivalent CSP directive (frame-ancestors, below) ships
-            // Report-Only for now, so on its own it wouldn't actually
-            // block anything yet — this does, immediately, and doesn't
-            // carry the same risk of breaking something unexpected that
-            // the fuller resource-loading policy does.
+            // Real, enforced clickjacking protection independent of CSP's
+            // own frame-ancestors directive below (belt and suspenders —
+            // older browsers without frame-ancestors support still get
+            // this one).
             key: "X-Frame-Options",
             value: "DENY",
           },
@@ -92,11 +90,9 @@ const nextConfig: NextConfig = {
             value: PERMISSIONS_POLICY,
           },
           {
-            // Report-Only deliberately: this lets the policy be verified
-            // against real traffic (nothing unexpectedly reported as
-            // blocked) before switching this same value over to an
-            // enforced `Content-Security-Policy` header.
-            key: "Content-Security-Policy-Report-Only",
+            // Verified Report-Only against real traffic first (every page
+            // type, zero unexpected violations) — now enforced.
+            key: "Content-Security-Policy",
             value: CSP_DIRECTIVES,
           },
         ],
