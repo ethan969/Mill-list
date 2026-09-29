@@ -19,6 +19,8 @@ export default function DetailsPanel({
     productionCompany: project.productionCompany,
     tagline: project.tagline ?? "",
     logline: project.logline ?? "",
+    approximateBudget: project.approximateBudget ?? "",
+    idealShootWindow: project.idealShootWindow ?? "",
   });
   const [newPassword, setNewPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -195,7 +197,7 @@ export default function DetailsPanel({
           />
         </Field>
 
-        <Field label="Logline" hint="Internal reference, not shown publicly">
+        <Field label="Logline" hint="Shown on this film's page within any slate it belongs to">
           <textarea
             className={`${inputClass} min-h-20`}
             value={form.logline}
@@ -207,6 +209,48 @@ export default function DetailsPanel({
 
         {error && <p className="text-xs text-danger">{error}</p>}
         {message && <p className="text-xs text-accent">{message}</p>}
+      </section>
+
+      <section className="flex flex-col gap-4 border-t border-border pt-6">
+        <div>
+          <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
+            Slate film page
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            Shown on this film&apos;s own page within any slate it belongs
+            to, alongside the logline, team (below, in About Us) and a
+            downloadable Creative Deck. Not shown on this project&apos;s own
+            room.
+          </p>
+        </div>
+
+        <Field label="Approximate budget" hint='e.g. "$2M – $4M"'>
+          <input
+            className={inputClass}
+            value={form.approximateBudget}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, approximateBudget: e.target.value }))
+            }
+          />
+        </Field>
+
+        <Field label="Ideal shooting window" hint='e.g. "Spring 2026"'>
+          <input
+            className={inputClass}
+            value={form.idealShootWindow}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, idealShootWindow: e.target.value }))
+            }
+          />
+        </Field>
+
+        <button
+          onClick={() => save()}
+          disabled={saving}
+          className="self-start rounded-md border border-border px-4 py-1.5 text-xs hover:border-accent hover:text-accent transition-colors disabled:opacity-40"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
       </section>
 
       <section className="flex flex-col gap-3 border-t border-border pt-6">

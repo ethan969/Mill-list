@@ -86,6 +86,8 @@ export const projectUpdateSchema = projectCreateSchema
     isPublished: z.boolean().optional(),
     aboutContent: z.string().max(20000).optional(),
     aboutTeam: z.array(teamMemberSchema).max(50).optional(),
+    approximateBudget: z.string().trim().max(200).optional().or(z.literal("")),
+    idealShootWindow: z.string().trim().max(200).optional().or(z.literal("")),
   });
 
 export const referenceLinkSchema = z.object({
@@ -117,4 +119,5 @@ export const slateCreateSchema = z.object({
 
 export const slateUpdateSchema = slateCreateSchema.partial().extend({
   isPublished: z.boolean().optional(),
+  aboutContent: z.string().max(20000).optional(),
 });

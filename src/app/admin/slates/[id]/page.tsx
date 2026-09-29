@@ -32,6 +32,7 @@ export default async function SlateEditPage({
     slug: slate.slug,
     title: slate.title,
     overview: slate.overview,
+    aboutContent: slate.aboutContent,
     themeId: slate.themeId,
     accentColor: slate.accentColor,
     fontId: slate.fontId,

@@ -41,6 +41,8 @@ export default async function ProjectEditPage({
     aboutTeam: Array.isArray(project.aboutTeam)
       ? (project.aboutTeam as unknown as AdminProject["aboutTeam"])
       : [],
+    approximateBudget: project.approximateBudget,
+    idealShootWindow: project.idealShootWindow,
     documents: project.documents.map((d) => ({
       id: d.id,
       section: d.section,

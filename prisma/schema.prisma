@@ -77,6 +77,12 @@ model Project {
   isPublished       Boolean  @default(false)
   aboutContent      String?
   aboutTeam         Json?
+  /// Shown on this film's dedicated page within a slate (src/app/slate/
+  /// [slug]/[projectSlug]) — free text, e.g. "$2M - $4M". Not used by the
+  /// project's own room.
+  approximateBudget String?
+  /// Same slate-film-page-only use as approximateBudget, e.g. "Spring 2026".
+  idealShootWindow  String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -90,15 +96,25 @@ model Project {
 }
 
 /// A curated, password-protected collection of existing Projects, browsable
-/// (and its own slate-level documents downloadable) under one shared
-/// password — see src/lib/access.ts for how a slate session additionally
-/// unlocks each member project's own room pages via live membership checks,
-/// rather than duplicating each project's own password.
+/// under one shared password. Each member film gets its own simplified page
+/// within the slate (src/app/slate/[slug]/[projectSlug] — logline, team,
+/// budget, shoot window, one downloadable deck), separate from that
+/// project's own full multi-section room. See src/lib/access.ts for how a
+/// slate session grants access to a member project's documents (and, if
+/// linked to directly, its room) via live membership checks, rather than
+/// duplicating each project's own password.
 model Slate {
   id             String   @id @default(cuid())
   slug           String   @unique
   title          String
+  /// Short teaser shown even before the password gate is passed (like a
+  /// project's tagline). aboutContent below is the longer production-
+  /// company intro shown only once inside the slate.
   overview       String?
+  /// The slate's own intro/"about us" page, shown once authenticated,
+  /// above the film grid — same paragraph-per-blank-line convention as
+  /// Project.aboutContent.
+  aboutContent   String?
   themeId        String   @default("midnight-gold")
   accentColor    String?
   fontId         String?

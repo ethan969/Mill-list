@@ -9,10 +9,16 @@ export type SlateFilm = {
   hasPoster: boolean;
 };
 
-export default function SlateFilmCard({ film }: { film: SlateFilm }) {
+export default function SlateFilmCard({
+  slateSlug,
+  film,
+}: {
+  slateSlug: string;
+  film: SlateFilm;
+}) {
   return (
     <Link
-      href={`/${film.slug}/room`}
+      href={`/slate/${slateSlug}/${film.slug}`}
       className="group relative flex aspect-[2/3] flex-col justify-end overflow-hidden rounded-lg border border-border bg-surface transition-colors hover:border-accent"
     >
       {film.hasPoster && (
@@ -34,7 +40,7 @@ export default function SlateFilmCard({ film }: { film: SlateFilm }) {
           <p className="mt-1 line-clamp-2 text-xs text-muted">{film.tagline}</p>
         )}
         <span className="mt-3 text-[11px] uppercase tracking-[0.2em] text-accent opacity-0 transition-opacity group-hover:opacity-100">
-          Enter data room →
+          View film →
         </span>
       </div>
     </Link>
