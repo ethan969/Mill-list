@@ -3,7 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-export default function PasswordGateForm({ slug }: { slug: string }) {
+export default function PasswordGateForm({
+  slug,
+  authPath,
+  redirectPath,
+}: {
+  slug: string;
+  /** Defaults to the room auth endpoint; pass a slate's to reuse this same form there. */
+  authPath?: string;
+  /** Where to send the browser once the password is accepted. Defaults to the room. */
+  redirectPath?: string;
+}) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -15,7 +25,7 @@ export default function PasswordGateForm({ slug }: { slug: string }) {
 
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/room/${slug}/auth`, {
+        const res = await fetch(authPath ?? `/api/room/${slug}/auth`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password }),
@@ -27,7 +37,7 @@ export default function PasswordGateForm({ slug }: { slug: string }) {
           return;
         }
 
-        router.push(`/${slug}/room`);
+        router.push(redirectPath ?? `/${slug}/room`);
         router.refresh();
       } catch {
         setError("Network error. Try again.");
