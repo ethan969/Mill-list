@@ -235,6 +235,28 @@ export default function SlateDetailsPanel({
 
       <section className="flex flex-col gap-3 border-t border-border pt-6">
         <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
+          Publish
+        </h2>
+        <div className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3">
+          <div>
+            <p className="text-sm">{slate.isPublished ? "Live" : "Draft"}</p>
+            <p className="text-xs text-muted">
+              {slate.isPublished
+                ? "Anyone with the link and password can access this slate."
+                : "The slate is hidden until you publish it."}
+            </p>
+          </div>
+          <button
+            onClick={() => save({ isPublished: !slate.isPublished })}
+            className="rounded-md border border-border px-3 py-1.5 text-xs hover:border-accent hover:text-accent transition-colors"
+          >
+            {slate.isPublished ? "Unpublish" : "Publish"}
+          </button>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted">
           Slate password
         </h2>
         <div className="flex gap-2">

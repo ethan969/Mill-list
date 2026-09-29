@@ -103,6 +103,11 @@ model Slate {
   accentColor    String?
   fontId         String?
   passwordHash   String
+  /// Same draft/live meaning as Project.isPublished: the public
+  /// /slate/[slug] page 404s while this is false, even with a valid
+  /// password. Defaults to false so a newly created slate isn't reachable
+  /// until an admin explicitly publishes it.
+  isPublished    Boolean  @default(false)
   /// Same invalidation pattern as Project.sessionVersion — bumped on a
   /// password change or an explicit revoke; every slate JWT carries the
   /// version it was issued under (src/lib/slate-token.ts).

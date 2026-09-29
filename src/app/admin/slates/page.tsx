@@ -10,6 +10,7 @@ export default async function AdminSlatesDashboard() {
       id: true,
       slug: true,
       title: true,
+      isPublished: true,
       _count: { select: { projects: true, documents: true } },
     },
   });
@@ -47,6 +48,15 @@ export default async function AdminSlatesDashboard() {
                   {s._count.documents} documents
                 </p>
               </div>
+              <span
+                className={`rounded-full px-3 py-1 text-[11px] uppercase tracking-wide ${
+                  s.isPublished
+                    ? "bg-accent/15 text-accent"
+                    : "bg-border text-muted"
+                }`}
+              >
+                {s.isPublished ? "Live" : "Draft"}
+              </span>
             </Link>
           ))}
         </div>

@@ -53,6 +53,16 @@ export default function SlateEditClient({
           <h1 className="mt-2 font-display text-3xl">{slate.title}</h1>
         </div>
         <div className="flex items-center gap-3">
+          {slate.isPublished && (
+            <a
+              href={`/slate/${slate.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted hover:text-accent transition-colors"
+            >
+              View slate ↗
+            </a>
+          )}
           <button
             onClick={handleDelete}
             className="text-xs text-danger hover:opacity-70 transition-opacity"

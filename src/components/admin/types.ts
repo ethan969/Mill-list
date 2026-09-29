@@ -44,6 +44,7 @@ export type AdminSlate = {
   themeId: string;
   accentColor: string | null;
   fontId: string | null;
+  isPublished: boolean;
   documents: AdminDocument[];
   projects: AdminSlateMember[];
 };

@@ -115,4 +115,6 @@ export const slateCreateSchema = z.object({
   password: roomPasswordSchema,
 });
 
-export const slateUpdateSchema = slateCreateSchema.partial();
+export const slateUpdateSchema = slateCreateSchema.partial().extend({
+  isPublished: z.boolean().optional(),
+});

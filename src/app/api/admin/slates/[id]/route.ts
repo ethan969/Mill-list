@@ -74,6 +74,7 @@ export async function PATCH(
         ? { accentColor: data.accentColor || null }
         : {}),
       ...(data.fontId !== undefined ? { fontId: data.fontId || null } : {}),
+      ...(data.isPublished !== undefined ? { isPublished: data.isPublished } : {}),
       ...(data.password
         ? {
             passwordHash: await hashPassword(data.password),

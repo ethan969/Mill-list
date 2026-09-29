@@ -15,9 +15,9 @@ export async function generateMetadata({
   const { slug } = await params;
   const slate = await prisma.slate.findUnique({
     where: { slug },
-    select: { title: true },
+    select: { title: true, isPublished: true },
   });
-  if (!slate) return {};
+  if (!slate || !slate.isPublished) return {};
   return {
     title: slate.title,
     description: "A private, curated collection of films.",
@@ -40,6 +40,7 @@ export default async function SlateLandingPage({
       themeId: true,
       accentColor: true,
       fontId: true,
+      isPublished: true,
       projects: {
         orderBy: { order: "asc" },
         select: {
@@ -58,7 +59,7 @@ export default async function SlateLandingPage({
     },
   });
 
-  if (!slate) notFound();
+  if (!slate || !slate.isPublished) notFound();
 
   const session = await getSlateSession(slug);
   const authenticated = Boolean(session && session.slateId === slate.id);

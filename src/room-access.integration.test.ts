@@ -129,6 +129,7 @@ beforeAll(async () => {
       slug: slateSlug,
       title: `Secret Slate ${rand}`,
       passwordHash: await bcrypt.hash(SLATE_PASSWORD, 12),
+      isPublished: true,
     },
   });
   slateId = slate.id;

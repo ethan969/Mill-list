@@ -35,6 +35,7 @@ export default async function SlateEditPage({
     themeId: slate.themeId,
     accentColor: slate.accentColor,
     fontId: slate.fontId,
+    isPublished: slate.isPublished,
     documents: slate.documents.map((d) => ({
       id: d.id,
       section: d.section,

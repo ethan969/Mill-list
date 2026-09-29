@@ -39,7 +39,7 @@ export async function POST(
 
   const slate = await prisma.slate.findUnique({ where: { slug } });
 
-  if (!slate) {
+  if (!slate || !slate.isPublished) {
     await recordAttempt(rateKey);
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
