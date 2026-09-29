@@ -13,7 +13,6 @@ export default async function SlateEditPage({
   const slate = await prisma.slate.findUnique({
     where: { id },
     include: {
-      documents: { orderBy: { order: "asc" } },
       projects: {
         orderBy: { order: "asc" },
         include: {
@@ -37,15 +36,6 @@ export default async function SlateEditPage({
     accentColor: slate.accentColor,
     fontId: slate.fontId,
     isPublished: slate.isPublished,
-    documents: slate.documents.map((d) => ({
-      id: d.id,
-      section: d.section,
-      title: d.title,
-      fileName: d.fileName,
-      fileSize: d.fileSize,
-      order: d.order,
-      createdAt: d.createdAt.toISOString(),
-    })),
     projects: slate.projects.map((sp) => ({
       projectId: sp.projectId,
       order: sp.order,
