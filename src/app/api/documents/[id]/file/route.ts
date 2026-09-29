@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyRoomAccessForProject } from "@/lib/auth";
+import { canAccessDocument } from "@/lib/access";
 import {
   getObjectWebStream,
   getPresignedDownloadUrl,
@@ -8,31 +8,25 @@ import {
 } from "@/lib/storage";
 
 // Streams the original document inline for the flick-through viewer.
-// Requires a valid room session for the document's own project.
+// Requires a valid room session for the document's own project, or a
+// valid slate session (either for a slate-level document, or reaching a
+// project's document via slate membership) — see @/lib/access.
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
   const document = await prisma.document.findUnique({
     where: { id },
-    select: {
-      id: true,
-      fileKey: true,
-      mimeType: true,
-      project: { select: { id: true, slug: true } },
-    },
+    select: { id: true, fileKey: true, mimeType: true },
   });
 
   if (!document) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  const allowed = await verifyRoomAccessForProject(
-    document.project.slug,
-    document.project.id
-  );
+  const allowed = await canAccessDocument(request, document.id);
   if (!allowed) {
     return NextResponse.json({ error: "Access denied." }, { status: 403 });
   }

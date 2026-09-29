@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyRoomAccessForProject } from "@/lib/auth";
+import { canAccessProject } from "@/lib/access";
 import { getObjectWebStream } from "@/lib/storage";
 
+// Gallery items don't have a slate-level equivalent (unlike Document) — a
+// slate visitor reaching one here does so via member-project access, same
+// as a room page.
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -14,7 +17,7 @@ export async function GET(
     select: {
       fileKey: true,
       mimeType: true,
-      project: { select: { id: true, slug: true } },
+      project: { select: { id: true } },
     },
   });
 
@@ -22,10 +25,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  const allowed = await verifyRoomAccessForProject(
-    item.project.slug,
-    item.project.id
-  );
+  const allowed = await canAccessProject(request, item.project.id);
   if (!allowed) {
     return NextResponse.json({ error: "Access denied." }, { status: 403 });
   }

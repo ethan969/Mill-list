@@ -25,6 +25,30 @@ export type AdminReferenceLink = {
 
 export type TeamMember = { name: string; role?: string; bio?: string };
 
+export type AdminSlateMember = {
+  projectId: string;
+  order: number;
+  project: {
+    id: string;
+    slug: string;
+    title: string;
+    productionCompany: string;
+  };
+};
+
+export type AdminSlate = {
+  id: string;
+  slug: string;
+  title: string;
+  overview: string | null;
+  themeId: string;
+  accentColor: string | null;
+  fontId: string | null;
+  isPublished: boolean;
+  documents: AdminDocument[];
+  projects: AdminSlateMember[];
+};
+
 export type AdminProject = {
   id: string;
   slug: string;

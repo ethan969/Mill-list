@@ -26,14 +26,22 @@ export function clientIp(request: NextRequest): string | null {
 }
 
 export async function recordDownload(params: {
-  projectId: string;
+  // The document's own project, if it has one (null for a slate-level
+  // document). slateId is separate and NOT mutually exclusive with
+  // projectId: it records *which slate the access came through*, set
+  // whenever a slate session was the credential used — even when
+  // downloading a project-owned document via slate membership, so the
+  // admin's download log can show both.
+  projectId?: string | null;
+  slateId?: string | null;
   documentId: string;
   email: string;
   request: NextRequest;
 }) {
   return prisma.documentDownload.create({
     data: {
-      projectId: params.projectId,
+      projectId: params.projectId ?? null,
+      slateId: params.slateId ?? null,
       documentId: params.documentId,
       email: params.email,
       ip: clientIp(params.request),

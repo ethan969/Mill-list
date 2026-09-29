@@ -24,9 +24,33 @@ export default function AdminHeader() {
   return (
     <header className="border-b border-border">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
-        <Link href="/admin" className="font-display text-lg tracking-wide">
-          Admin
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/admin" className="font-display text-lg tracking-wide">
+            Admin
+          </Link>
+          <nav className="flex items-center gap-4 text-xs uppercase tracking-widest">
+            <Link
+              href="/admin"
+              className={
+                pathname === "/admin"
+                  ? "text-accent"
+                  : "text-muted hover:text-accent transition-colors"
+              }
+            >
+              Projects
+            </Link>
+            <Link
+              href="/admin/slates"
+              className={
+                pathname.startsWith("/admin/slates")
+                  ? "text-accent"
+                  : "text-muted hover:text-accent transition-colors"
+              }
+            >
+              Slates
+            </Link>
+          </nav>
+        </div>
         <button
           onClick={handleSignOut}
           className="text-[11px] uppercase tracking-widest text-muted hover:text-accent transition-colors"

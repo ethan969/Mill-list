@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
-import { verifyRoomToken } from "@/lib/room-token";
+import { prisma } from "@/lib/db";
+import { canAccessProject } from "@/lib/access";
 
 const secretValue = process.env.SESSION_SECRET || "";
 const secret = new TextEncoder().encode(secretValue);
@@ -18,17 +19,23 @@ async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
 }
 
 // Proxy defaults to the Node.js runtime in Next.js 16, so it can call
-// verifyRoomToken directly (Prisma included) — this stops an unauthenticated
-// or session-version-revoked request from ever reaching room page code,
-// rather than relying solely on the page-level requireRoomAccess() guard.
-async function hasValidRoomSession(
+// canAccessProject directly (Prisma included) — this stops an
+// unauthenticated or session-version-revoked request from ever reaching
+// room page code, rather than relying solely on the page-level
+// requireRoomAccess() guard. Accepts either a room session for this exact
+// project or a slate session for a slate that currently includes it (see
+// @/lib/access) — a slate visitor reaches these same room pages via
+// direct links, not a separate room password.
+async function hasRoomOrSlateAccess(
   request: NextRequest,
   slug: string
 ): Promise<boolean> {
-  const token = request.cookies.get(`room_${slug}`)?.value;
-  if (!token) return false;
-  const payload = await verifyRoomToken(token, slug);
-  return Boolean(payload);
+  const project = await prisma.project.findUnique({
+    where: { slug },
+    select: { id: true },
+  });
+  if (!project) return false;
+  return canAccessProject(request, project.id);
 }
 
 const ADMIN_API_2FA_EXEMPT = new Set([
@@ -86,7 +93,7 @@ export async function proxy(request: NextRequest) {
     : null;
   if (roomMatch) {
     const slug = roomMatch[1];
-    const ok = await hasValidRoomSession(request, slug);
+    const ok = await hasRoomOrSlateAccess(request, slug);
     if (!ok) {
       const url = new URL(`/${slug}`, request.url);
       return NextResponse.redirect(url);
