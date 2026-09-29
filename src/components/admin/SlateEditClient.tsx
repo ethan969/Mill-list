@@ -3,17 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DOCUMENT_SECTIONS } from "@/lib/sections";
 import type { AdminSlate } from "@/components/admin/types";
 import SlateDetailsPanel from "@/components/admin/SlateDetailsPanel";
 import SlateFilmsPanel from "@/components/admin/SlateFilmsPanel";
-import SlateDocumentsPanel from "@/components/admin/SlateDocumentsPanel";
+import SlateFilmDetailsPanel from "@/components/admin/SlateFilmDetailsPanel";
 
-const TABS = [
-  { key: "details", label: "Details" },
-  { key: "films", label: "Films" },
-  ...DOCUMENT_SECTIONS.map((s) => ({ key: s.slug, label: s.label })),
-];
+const FILM_TAB_PREFIX = "film:";
 
 export default function SlateEditClient({
   initialSlate,
@@ -31,7 +26,7 @@ export default function SlateEditClient({
   async function handleDelete() {
     if (
       !confirm(
-        `Permanently delete "${slate.title}" and all its slate-level documents? This can't be undone. Films that belong to it are not affected.`
+        `Permanently delete "${slate.title}"? This can't be undone. Films that belong to it, and their own decks, are not affected.`
       )
     )
       return;
@@ -41,7 +36,10 @@ export default function SlateEditClient({
     if (res.ok) router.push("/admin/slates");
   }
 
-  const section = DOCUMENT_SECTIONS.find((s) => s.slug === tab);
+  const films = [...slate.projects].sort((a, b) => a.order - b.order);
+  const activeFilm = tab.startsWith(FILM_TAB_PREFIX)
+    ? films.find((f) => tab === `${FILM_TAB_PREFIX}${f.projectId}`)
+    : undefined;
 
   return (
     <div>
@@ -73,19 +71,42 @@ export default function SlateEditClient({
       </div>
 
       <nav className="mt-8 flex gap-5 overflow-x-auto border-b border-border pb-px text-sm">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`whitespace-nowrap border-b-2 pb-3 transition-colors ${
-              tab === t.key
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted hover:text-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+        <button
+          onClick={() => setTab("details")}
+          className={`whitespace-nowrap border-b-2 pb-3 transition-colors ${
+            tab === "details"
+              ? "border-accent text-foreground"
+              : "border-transparent text-muted hover:text-foreground"
+          }`}
+        >
+          Details
+        </button>
+        <button
+          onClick={() => setTab("films")}
+          className={`whitespace-nowrap border-b-2 pb-3 transition-colors ${
+            tab === "films"
+              ? "border-accent text-foreground"
+              : "border-transparent text-muted hover:text-foreground"
+          }`}
+        >
+          Films
+        </button>
+        {films.map((f) => {
+          const key = `${FILM_TAB_PREFIX}${f.projectId}`;
+          return (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`whitespace-nowrap border-b-2 pb-3 transition-colors ${
+                tab === key
+                  ? "border-accent text-foreground"
+                  : "border-transparent text-muted hover:text-foreground"
+              }`}
+            >
+              {f.project.title}
+            </button>
+          );
+        })}
       </nav>
 
       <div className="mt-8">
@@ -93,9 +114,18 @@ export default function SlateEditClient({
           <SlateDetailsPanel slate={slate} onUpdate={onUpdate} />
         )}
         {tab === "films" && <SlateFilmsPanel slate={slate} onUpdate={onUpdate} />}
-        {section && (
-          <SlateDocumentsPanel slate={slate} section={section} onUpdate={onUpdate} />
-        )}
+        {tab.startsWith(FILM_TAB_PREFIX) &&
+          (activeFilm ? (
+            <SlateFilmDetailsPanel
+              key={activeFilm.projectId}
+              projectId={activeFilm.projectId}
+              projectTitle={activeFilm.project.title}
+            />
+          ) : (
+            <p className="text-sm text-muted">
+              This film is no longer in the slate.
+            </p>
+          ))}
       </div>
     </div>
   );
