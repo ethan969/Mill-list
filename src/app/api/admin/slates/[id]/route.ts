@@ -69,6 +69,9 @@ export async function PATCH(
       ...(data.slug ? { slug: data.slug } : {}),
       ...(data.title ? { title: data.title } : {}),
       ...(data.overview !== undefined ? { overview: data.overview || null } : {}),
+      ...(data.aboutContent !== undefined
+        ? { aboutContent: data.aboutContent || null }
+        : {}),
       ...(data.themeId ? { themeId: data.themeId } : {}),
       ...(data.accentColor !== undefined
         ? { accentColor: data.accentColor || null }

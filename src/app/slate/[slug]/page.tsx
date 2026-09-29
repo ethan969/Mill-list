@@ -37,6 +37,7 @@ export default async function SlateLandingPage({
       id: true,
       title: true,
       overview: true,
+      aboutContent: true,
       themeId: true,
       accentColor: true,
       fontId: true,
@@ -51,7 +52,6 @@ export default async function SlateLandingPage({
               productionCompany: true,
               tagline: true,
               posterKey: true,
-              isPublished: true,
             },
           },
         },
@@ -64,19 +64,17 @@ export default async function SlateLandingPage({
   const session = await getSlateSession(slug);
   const authenticated = Boolean(session && session.slateId === slate.id);
 
-  // A film only ever gets a page through its own room (see
-  // src/app/[slug]/room), which 404s for an unpublished project even to a
-  // valid slate cookie holder — so an unpublished member is left off this
-  // list rather than linking to a page that wouldn't open.
-  const films: SlateFilm[] = slate.projects
-    .filter((sp) => sp.project.isPublished)
-    .map((sp) => ({
-      slug: sp.project.slug,
-      title: sp.project.title,
-      productionCompany: sp.project.productionCompany,
-      tagline: sp.project.tagline,
-      hasPoster: Boolean(sp.project.posterKey),
-    }));
+  // Every slate member appears here, published or not: a film's slate page
+  // (src/app/slate/[slug]/[projectSlug]) is access-controlled entirely
+  // through slate membership, independent of the project's own
+  // draft/published state.
+  const films: SlateFilm[] = slate.projects.map((sp) => ({
+    slug: sp.project.slug,
+    title: sp.project.title,
+    productionCompany: sp.project.productionCompany,
+    tagline: sp.project.tagline,
+    hasPoster: Boolean(sp.project.posterKey),
+  }));
 
   return (
     <ThemeWrapper
@@ -90,6 +88,7 @@ export default async function SlateLandingPage({
           slug={slug}
           title={slate.title}
           overview={slate.overview}
+          aboutContent={slate.aboutContent}
           films={films}
         />
       ) : (

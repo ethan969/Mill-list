@@ -84,6 +84,12 @@ export async function PATCH(
         ? { aboutContent: data.aboutContent }
         : {}),
       ...(data.aboutTeam !== undefined ? { aboutTeam: data.aboutTeam } : {}),
+      ...(data.approximateBudget !== undefined
+        ? { approximateBudget: data.approximateBudget || null }
+        : {}),
+      ...(data.idealShootWindow !== undefined
+        ? { idealShootWindow: data.idealShootWindow || null }
+        : {}),
       ...(data.password
         ? {
             passwordHash: await hashPassword(data.password),

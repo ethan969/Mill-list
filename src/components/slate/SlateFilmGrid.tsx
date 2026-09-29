@@ -5,13 +5,20 @@ export default function SlateFilmGrid({
   slug,
   title,
   overview,
+  aboutContent,
   films,
 }: {
   slug: string;
   title: string;
   overview: string | null;
+  aboutContent: string | null;
   films: SlateFilm[];
 }) {
+  const aboutParagraphs = (aboutContent || "")
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-border">
@@ -31,7 +38,15 @@ export default function SlateFilmGrid({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-10 sm:px-8">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-5 py-10 sm:px-8">
+        {aboutParagraphs.length > 0 && (
+          <div className="flex max-w-2xl flex-col gap-4 text-sm leading-relaxed text-foreground/90">
+            {aboutParagraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+        )}
+
         {films.length === 0 ? (
           <p className="text-sm text-muted">
             This slate doesn&apos;t have any films available yet.
@@ -39,7 +54,7 @@ export default function SlateFilmGrid({
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {films.map((film) => (
-              <SlateFilmCard key={film.slug} film={film} />
+              <SlateFilmCard key={film.slug} slateSlug={slug} film={film} />
             ))}
           </div>
         )}

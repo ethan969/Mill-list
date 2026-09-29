@@ -16,6 +16,7 @@ export default function SlateDetailsPanel({
     title: slate.title,
     slug: slate.slug,
     overview: slate.overview ?? "",
+    aboutContent: slate.aboutContent ?? "",
   });
   const [newPassword, setNewPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -118,12 +119,25 @@ export default function SlateDetailsPanel({
           />
         </Field>
 
-        <Field label="Overview" hint="Shown to whoever opens the slate">
+        <Field label="Overview" hint="A short teaser, shown even before the password is entered">
           <textarea
             className={`${inputClass} min-h-24`}
             value={form.overview}
             onChange={(e) =>
               setForm((f) => ({ ...f, overview: e.target.value }))
+            }
+          />
+        </Field>
+
+        <Field
+          label="About us"
+          hint="The slate's own intro page, shown once inside — separate paragraphs with a blank line"
+        >
+          <textarea
+            className={`${inputClass} min-h-40`}
+            value={form.aboutContent}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, aboutContent: e.target.value }))
             }
           />
         </Field>

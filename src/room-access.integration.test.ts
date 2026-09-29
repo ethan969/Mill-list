@@ -70,6 +70,10 @@ let secrets: string[];
 let secretDocTitles: Record<string, string>;
 let slateId: string;
 let slateSlug: string;
+let nonMemberProjectId: string;
+let nonMemberSlug: string;
+let secretLogline: string;
+let secretTeamMemberName: string;
 const SLATE_PASSWORD = "slate-integration-test-password";
 
 beforeAll(async () => {
@@ -87,6 +91,9 @@ beforeAll(async () => {
     PRODUCTION_PLAN: `SECRET-PLAN-TITLE-${rand}`,
   };
 
+  secretLogline = `SECRET-LOGLINE-${rand}`;
+  secretTeamMemberName = `Jane Doe ${rand}`;
+
   const project = await prisma.project.create({
     data: {
       slug,
@@ -95,10 +102,28 @@ beforeAll(async () => {
       passwordHash: "unused-in-this-test",
       isPublished: true,
       aboutContent: secretAbout,
-      aboutTeam: [{ name: "Jane Doe", role: "Director", bio: secretBio }],
+      aboutTeam: [{ name: secretTeamMemberName, role: "Director", bio: secretBio }],
+      logline: secretLogline,
+      approximateBudget: "$2M - $4M",
+      idealShootWindow: "Spring 2026",
     },
   });
   projectId = project.id;
+
+  // A real project that exists but is never added to the slate below —
+  // used to confirm the slate film page 404s for a non-member rather than
+  // leaking that the project exists.
+  const nonMemberProject = await prisma.project.create({
+    data: {
+      slug: `non-member-project-${rand}`,
+      title: `Non-Member Project ${rand}`,
+      productionCompany: "Secret Co",
+      passwordHash: "unused-in-this-test",
+      isPublished: true,
+    },
+  });
+  nonMemberProjectId = nonMemberProject.id;
+  nonMemberSlug = nonMemberProject.slug;
 
   await prisma.document.createMany({
     data: Object.entries(secretDocTitles).map(([section, title]) => ({
@@ -177,6 +202,7 @@ afterAll(async () => {
   // SlateProject also references projectId.
   await prisma.slate.delete({ where: { id: slateId } }).catch(() => {});
   await prisma.project.delete({ where: { id: projectId } }).catch(() => {});
+  await prisma.project.delete({ where: { id: nonMemberProjectId } }).catch(() => {});
 });
 
 describe("proxy room gate: every room route, three invalid-session states", () => {
@@ -303,5 +329,54 @@ describe("slate access via a real server (the one case that can't be unit-tested
     });
     expect(authRes.status).toBe(401);
     expect(authRes.headers.get("set-cookie")).toBeNull();
+  });
+});
+
+describe("a film's dedicated slate page (src/app/slate/[slug]/[projectSlug])", () => {
+  async function slateCookie(): Promise<string> {
+    const current = await prisma.slate.findUniqueOrThrow({ where: { id: slateId } });
+    const { signSlateToken } = await import("@/lib/slate-token");
+    const token = await signSlateToken(slateId, slateSlug, current.sessionVersion);
+    return `slate_${slateSlug}=${token}`;
+  }
+
+  it("redirects to the slate's gate page with no slate session", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${slug}`, {
+      redirect: "manual",
+    });
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe(`/slate/${slateSlug}`);
+  });
+
+  it("shows logline, budget, shoot window, team and the embedded deck for a member film", async () => {
+    const cookie = await slateCookie();
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${slug}`, {
+      redirect: "manual",
+      headers: { cookie },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain(secretLogline);
+    expect(body).toContain("$2M - $4M");
+    expect(body).toContain("Spring 2026");
+    expect(body).toContain(secretTeamMemberName);
+    // The deck is embedded inline (DocumentSectionView, same viewer as a
+    // room's own document sections) rather than just a download button —
+    // its title and the "Email watermarked copy" request button both
+    // render on this page directly.
+    expect(body).toContain(secretDocTitles.CREATIVE_DECK);
+    expect(body).toContain("Email watermarked copy");
+    // Not the full multi-tab room — its own nav ("Exit room", section
+    // tabs) never appears here.
+    expect(body).not.toContain("Exit room");
+  });
+
+  it("404s for a real project that isn't a member of this slate", async () => {
+    const cookie = await slateCookie();
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${nonMemberSlug}`, {
+      redirect: "manual",
+      headers: { cookie },
+    });
+    expect(res.status).toBe(404);
   });
 });

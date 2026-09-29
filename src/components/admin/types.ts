@@ -41,6 +41,7 @@ export type AdminSlate = {
   slug: string;
   title: string;
   overview: string | null;
+  aboutContent: string | null;
   themeId: string;
   accentColor: string | null;
   fontId: string | null;
@@ -66,6 +67,8 @@ export type AdminProject = {
   isPublished: boolean;
   aboutContent: string | null;
   aboutTeam: TeamMember[] | null;
+  approximateBudget: string | null;
+  idealShootWindow: string | null;
   documents: AdminDocument[];
   gallery: AdminGalleryItem[];
   references: AdminReferenceLink[];
