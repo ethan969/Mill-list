@@ -1,15 +1,30 @@
 @import "tailwindcss";
 
+/*
+ * Platform palette — Stock/Graphite/Pencil/Edge/Screen. Deliberately
+ * fixed and universal: every room/slate shares this one neutral "gallery
+ * wall" frame regardless of its theme. Only --accent/--accent-foreground
+ * (and --font-display) still vary per project/slate — see
+ * src/lib/themes.ts#themeStyleVars, which no longer overrides background/
+ * surface/surface-raised/foreground/muted/border at all. Contrast
+ * checked: Pencil-on-Stock sits right at WCAG AA's 4.5:1 floor for body
+ * text; Edge is a deliberately quiet hairline, not held to that bar.
+ */
 :root {
-  --background: #0b0b0c;
-  --surface: #141416;
-  --surface-raised: #1c1c1f;
-  --border: #2a2a2e;
-  --foreground: #f2f1ec;
-  --muted: #a3a29b;
+  --background: #f2f2ee; /* Stock */
+  --surface: #f2f2ee; /* Stock — flush with the page; a hairline border is
+                          what distinguishes a grouping now, not a fill
+                          color (see design/before/audit.md item 1). */
+  --surface-raised: #f2f2ee; /* Stock */
+  --border: #d5d6d1; /* Edge */
+  --foreground: #1d2024; /* Graphite */
+  --muted: #6b6f75; /* Pencil */
   --accent: #c9a24b;
   --accent-foreground: #14120a;
   --danger: #c1553d;
+  --screen: #000000; /* Screen — reserved for letterboxing (e.g. the
+                         gallery's full-bleed media viewer), never a
+                         general-purpose background. */
 }
 
 @theme inline {
@@ -22,8 +37,41 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-danger: var(--danger);
+  --color-screen: var(--screen);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
+  --font-mono: var(--font-courier-prime);
+}
+
+/*
+ * Type scale — a strict 1.25 (major third) ratio from a 16px base,
+ * replacing Tailwind's default non-modular scale. Same utility names
+ * (text-xs … text-7xl) throughout the app, so no component className
+ * changes were needed to pick this up.
+ */
+@theme {
+  --text-xs: 0.64rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.5625rem;
+  --text-xl--line-height: 2rem;
+  --text-2xl: 1.953125rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2.441406rem;
+  --text-3xl--line-height: 2.625rem;
+  --text-4xl: 3.051758rem;
+  --text-4xl--line-height: 3.25rem;
+  --text-5xl: 3.814697rem;
+  --text-5xl--line-height: 1;
+  --text-6xl: 4.768372rem;
+  --text-6xl--line-height: 1;
+  --text-7xl: 5.960465rem;
+  --text-7xl--line-height: 1;
 }
 
 * {
@@ -35,6 +83,16 @@ body {
   color: var(--foreground);
 }
 
+/*
+ * Tabular figures for all numbers — money, stats, page counters never
+ * jitter in width as digits change. Deliberately scoped to number-bearing
+ * elements (via Tailwind's built-in `tabular-nums` utility) rather than
+ * applied to `body` as a whole: tested and reverted that global version
+ * first — in this font, enabling tabular-nums site-wide also disturbs
+ * the spacing around punctuation in ordinary prose, which the brief
+ * never asked for.
+ */
+
 ::selection {
   background: var(--accent);
   color: var(--accent-foreground);
@@ -42,6 +100,28 @@ body {
 
 .text-balance {
   text-wrap: balance;
+}
+
+/*
+ * Visible keyboard focus. Several inputs across the app set
+ * `outline-none` and rely only on a border-color change (see
+ * design/before/audit.md) — not visible enough for keyboard navigation,
+ * so this intentionally overrides that per-component reset rather than
+ * requiring every component to remember to add its own focus style.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
 }
 
 @keyframes fade-up {

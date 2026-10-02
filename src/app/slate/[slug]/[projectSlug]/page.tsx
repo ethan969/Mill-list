@@ -149,7 +149,7 @@ export default async function SlateFilmPage({
             <h2 className="text-xs uppercase tracking-[0.25em] text-muted">
               Logline
             </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-foreground/90">
+            <p className="mt-3 max-w-prose text-sm leading-relaxed text-foreground/90">
               {project.logline}
             </p>
           </div>
@@ -281,7 +281,7 @@ function FinanceStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border bg-background/40 p-3">
       <p className="text-[10px] uppercase tracking-[0.15em] text-muted">{label}</p>
-      <p className="mt-1 text-sm">{value}</p>
+      <p className="mt-1 text-sm tabular-nums">{value}</p>
     </div>
   );
 }

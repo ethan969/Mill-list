@@ -111,7 +111,7 @@ export default function SlateFinanceOverview({
           </p>
           <p className="mt-1 text-sm text-foreground/90">{structure.description}</p>
           {finance.recoupmentNote && (
-            <p className="mt-2 text-sm text-foreground/80">{finance.recoupmentNote}</p>
+            <p className="mt-2 max-w-prose text-sm text-foreground/80">{finance.recoupmentNote}</p>
           )}
         </div>
       )}
@@ -162,7 +162,7 @@ export default function SlateFinanceOverview({
             })}
           </p>
         )}
-        {finance.disclaimerText && <p>{finance.disclaimerText}</p>}
+        {finance.disclaimerText && <p className="max-w-prose">{finance.disclaimerText}</p>}
       </div>
     </section>
   );
@@ -172,7 +172,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border bg-background/40 p-3">
       <p className="text-[10px] uppercase tracking-[0.15em] text-muted">{label}</p>
-      <p className="mt-1 text-sm">{value}</p>
+      <p className="mt-1 text-sm tabular-nums">{value}</p>
     </div>
   );
 }

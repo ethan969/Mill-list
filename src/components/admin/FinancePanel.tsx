@@ -407,7 +407,7 @@ function Stat({
   return (
     <div className="rounded-md border border-border bg-surface p-3">
       <p className="text-[10px] uppercase tracking-[0.15em] text-muted">{label}</p>
-      <p className="mt-1 text-sm">
+      <p className="mt-1 text-sm tabular-nums">
         {typeof value === "number" ? `${symbol}${formatMoneyMinorToMajor(value)}` : value}
       </p>
     </div>

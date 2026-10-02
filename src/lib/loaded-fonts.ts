@@ -1,5 +1,6 @@
 import {
-  Inter,
+  Schibsted_Grotesk,
+  Courier_Prime,
   Cormorant_Garamond,
   Playfair_Display,
   Space_Grotesk,
@@ -8,16 +9,33 @@ import {
   Bebas_Neue,
 } from "next/font/google";
 
-// next/font must be called at module scope, so all seven fonts have to be
+// next/font must be called at module scope, so all eight fonts have to be
 // instantiated here regardless of which ones any given page uses. What
 // varies per page is which of their `.variable` classes actually gets
 // applied to the tree (see ThemeWrapper) — `preload: false` on the six
-// display fonts means an unapplied one is never fetched at all, since
-// nothing lazily requests a font whose custom property isn't in scope.
+// curated display fonts (and on Courier Prime) means an unapplied one is
+// never fetched at all, since nothing lazily requests a font whose custom
+// property isn't in scope.
 
-export const body = Inter({
+// The platform typeface — applied everywhere via --font-body/--font-sans
+// (globals.css), regardless of which theme or display font a given
+// project/slate uses (see src/lib/themes.ts#themeStyleVars, which only
+// ever overrides --accent and --font-display, never the body font).
+export const body = Schibsted_Grotesk({
   variable: "--font-body",
   subsets: ["latin"],
+});
+
+// The script viewer's own typeface (src/components/DocumentSectionView.tsx's
+// `monospace` prop, set only by src/app/[slug]/room/script/page.tsx) — a
+// typewriter face for the one place in the product that's meant to feel
+// like a physical screenplay page, distinct from the platform body font
+// everywhere else.
+export const courierPrime = Courier_Prime({
+  variable: "--font-courier-prime",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  preload: false,
 });
 
 const cormorant = Cormorant_Garamond({

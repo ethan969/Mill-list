@@ -38,14 +38,14 @@ export default function SlateFilmGrid({
             <SlateExitButton slug={slug} />
           </div>
           {overview && (
-            <p className="max-w-2xl text-sm text-muted">{overview}</p>
+            <p className="max-w-prose text-sm text-muted">{overview}</p>
           )}
         </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-5 py-10 sm:px-8">
         {aboutParagraphs.length > 0 && (
-          <div className="flex max-w-2xl flex-col gap-4 text-sm leading-relaxed text-foreground/90">
+          <div className="flex max-w-prose flex-col gap-4 text-sm leading-relaxed text-foreground/90">
             {aboutParagraphs.map((p, i) => (
               <p key={i}>{p}</p>
             ))}

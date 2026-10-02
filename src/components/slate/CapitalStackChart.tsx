@@ -92,7 +92,7 @@ export default function CapitalStackChart({
               style={{ background: "var(--accent)", opacity: s.opacity }}
               aria-hidden="true"
             />
-            {s.label}: {fmt(s.minor)}
+            {s.label}: <span className="tabular-nums">{fmt(s.minor)}</span>
           </li>
         ))}
         {gap > 0 && (
@@ -101,12 +101,12 @@ export default function CapitalStackChart({
               className="h-2 w-2 shrink-0 rounded-full border border-border"
               aria-hidden="true"
             />
-            Remaining to raise: {fmt(gap)}
+            Remaining to raise: <span className="tabular-nums">{fmt(gap)}</span>
           </li>
         )}
         {exceedsBudget && (
           <li className="flex items-center gap-1.5 text-danger">
-            Sources exceed the {fmt(budget as number)} budget
+            Sources exceed the <span className="tabular-nums">{fmt(budget as number)}</span> budget
           </li>
         )}
       </ul>

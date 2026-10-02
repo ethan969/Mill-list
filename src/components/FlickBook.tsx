@@ -10,6 +10,7 @@ export default function FlickBook({
   pdfWidth,
   pdfHeight,
   onLoaded,
+  monospace = false,
 }: {
   fileUrl: string;
   // The PDF's own first-page size (in points), read at upload time — used
@@ -18,6 +19,7 @@ export default function FlickBook({
   pdfWidth?: number | null;
   pdfHeight?: number | null;
   onLoaded?: (pageCount: number) => void;
+  monospace?: boolean;
 }) {
   const aspectRatio = pdfWidth && pdfHeight ? pdfWidth / pdfHeight : undefined;
   const [numPages, setNumPages] = useState<number | null>(null);
@@ -133,7 +135,9 @@ export default function FlickBook({
             onChange={(e) => setPageNumber(Number(e.target.value))}
             className="h-1 flex-1 accent-accent"
           />
-          <span className="whitespace-nowrap text-xs text-muted">
+          <span
+            className={`whitespace-nowrap text-xs tabular-nums text-muted ${monospace ? "font-mono" : ""}`}
+          >
             Page {pageNumber} / {numPages}
           </span>
         </div>

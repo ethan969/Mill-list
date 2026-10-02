@@ -206,6 +206,17 @@ function readableForeground(hex: string): string {
  * CSS custom properties for a project's chosen theme, with an optional
  * accent-color override and an optional font override (independent of the
  * theme's own suggested font).
+ *
+ * Only ever overrides --accent/--accent-foreground/--font-display. The
+ * platform palette (background/surface/surface-raised/foreground/muted/
+ * border — Stock/Graphite/Pencil/Edge in globals.css) is deliberately
+ * fixed and universal across every theme: "the platform is a quiet,
+ * precise frame around each film, like a gallery wall" — only the accent
+ * color and the display titling font are the room's own. A Theme's own
+ * colors.background/surface/surfaceRaised/foreground/muted/border fields
+ * are kept only as the admin theme-picker's preview swatch data (see
+ * src/components/admin/DetailsPanel.tsx) and are no longer applied to
+ * any actual page.
  */
 export function themeStyleVars(
   themeId: string | null | undefined,
@@ -219,19 +230,6 @@ export function themeStyleVars(
     : theme.colors.accentForeground;
   const fontVar = getFont(fontIdOverride)?.fontVar ?? theme.fontVar;
   return {
-    // Tailwind's `@theme inline` block in globals.css maps e.g.
-    // --color-background to var(--background) and *inlines* that
-    // reference into every utility that uses it (so `.bg-background`
-    // compiles to `background-color: var(--background)`, not
-    // `var(--color-background)`). These per-project overrides have to
-    // target those underlying bare variable names, not the `--color-*`
-    // ones, or Tailwind's compiled utilities never see them.
-    "--background": theme.colors.background,
-    "--surface": theme.colors.surface,
-    "--surface-raised": theme.colors.surfaceRaised,
-    "--border": theme.colors.border,
-    "--foreground": theme.colors.foreground,
-    "--muted": theme.colors.muted,
     "--accent": accent,
     "--accent-foreground": accentForeground,
     "--font-display": `var(${fontVar})`,

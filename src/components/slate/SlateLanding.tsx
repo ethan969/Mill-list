@@ -29,7 +29,7 @@ export default function SlateLanding({
         </h1>
         {overview && (
           <p
-            className="animate-fade-up mt-7 max-w-xl text-balance text-base text-muted sm:text-lg"
+            className="animate-fade-up mt-7 max-w-prose text-balance text-base text-muted sm:text-lg"
             style={{ animationDelay: "0.1s" }}
           >
             {overview}

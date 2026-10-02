@@ -25,8 +25,12 @@ type DocSummary = {
 
 export default function DocumentSectionView({
   documents,
+  monospace = false,
 }: {
   documents: DocSummary[];
+  /** Set only by the script page — Courier Prime for the one section of
+   * the product meant to feel like a physical screenplay page. */
+  monospace?: boolean;
 }) {
   const [activeId, setActiveId] = useState(documents[0]?.id ?? "");
   const [downloadTarget, setDownloadTarget] = useState<DocSummary | null>(
@@ -45,6 +49,8 @@ export default function DocumentSectionView({
               key={doc.id}
               onClick={() => setActiveId(doc.id)}
               className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${
+                monospace ? "font-mono" : ""
+              } ${
                 doc.id === active.id
                   ? "border-accent bg-accent text-accent-foreground"
                   : "border-border text-muted hover:text-foreground"
@@ -57,10 +63,14 @@ export default function DocumentSectionView({
       )}
 
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-2xl">{active.title}</h2>
+        <h2 className={monospace ? "font-mono text-2xl" : "font-display text-2xl"}>
+          {active.title}
+        </h2>
         <button
           onClick={() => setDownloadTarget(active)}
-          className="rounded-md border border-border px-4 py-2 text-xs uppercase tracking-widest text-muted hover:border-accent hover:text-accent transition-colors"
+          className={`rounded-md border border-border px-4 py-2 text-xs uppercase tracking-widest text-muted hover:border-accent hover:text-accent transition-colors ${
+            monospace ? "font-mono" : ""
+          }`}
         >
           Email watermarked copy
         </button>
@@ -71,6 +81,7 @@ export default function DocumentSectionView({
         fileUrl={`/api/documents/${active.id}/file`}
         pdfWidth={active.pageWidth}
         pdfHeight={active.pageHeight}
+        monospace={monospace}
       />
 
       {downloadTarget && (

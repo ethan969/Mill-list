@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { body, DEFAULT_DISPLAY_FONT_VARIABLE } from "@/lib/loaded-fonts";
+import { body, courierPrime, DEFAULT_DISPLAY_FONT_VARIABLE } from "@/lib/loaded-fonts";
 import "./globals.css";
 
 // Only the body font and the default theme's display font are applied
@@ -22,7 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${body.variable} ${DEFAULT_DISPLAY_FONT_VARIABLE} h-full antialiased`}
+      className={`${body.variable} ${courierPrime.variable} ${DEFAULT_DISPLAY_FONT_VARIABLE} h-full antialiased`}
     >
       <body
         className="min-h-full flex flex-col bg-background text-foreground font-sans"

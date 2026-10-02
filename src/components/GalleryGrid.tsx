@@ -47,7 +47,7 @@ export default function GalleryGrid({ items }: { items: Item[] }) {
 
       {lightboxItem && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-screen/85 p-6"
           onClick={() => setLightboxId(null)}
         >
           <div

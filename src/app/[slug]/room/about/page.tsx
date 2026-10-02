@@ -44,7 +44,7 @@ export default async function AboutPage({
     <div className="flex flex-col gap-10">
       <div>
         <h2 className="font-display text-2xl">{project.productionCompany}</h2>
-        <div className="mt-4 flex max-w-2xl flex-col gap-4 text-sm leading-relaxed text-foreground/90">
+        <div className="mt-4 flex max-w-prose flex-col gap-4 text-sm leading-relaxed text-foreground/90">
           {paragraphs.map((p, i) => (
             <p key={i}>{p}</p>
           ))}

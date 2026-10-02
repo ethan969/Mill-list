@@ -38,7 +38,7 @@ export default function LandingCentered({
         </h1>
         {project.tagline && (
           <p
-            className={`animate-fade-up mt-7 max-w-xl text-balance text-base text-muted sm:text-lg ${
+            className={`animate-fade-up mt-7 max-w-prose text-balance text-base text-muted sm:text-lg ${
               project.hasPoster ? "text-shadow-hero" : ""
             }`}
             style={{ animationDelay: "0.1s" }}

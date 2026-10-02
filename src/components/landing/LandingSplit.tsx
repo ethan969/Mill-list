@@ -36,7 +36,7 @@ export default function LandingSplit({
         </h1>
         {project.tagline && (
           <p
-            className="animate-fade-up mt-6 max-w-md text-balance text-base text-muted"
+            className="animate-fade-up mt-6 max-w-prose text-balance text-base text-muted"
             style={{ animationDelay: "0.1s" }}
           >
             {project.tagline}

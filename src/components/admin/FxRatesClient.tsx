@@ -150,7 +150,7 @@ export default function FxRatesClient({
               className="flex items-center justify-between gap-3 px-4 py-3"
             >
               <div>
-                <p className="text-sm">
+                <p className="text-sm tabular-nums">
                   1 {r.from} = {r.rate} {r.to}
                 </p>
                 <p className="text-xs text-muted">

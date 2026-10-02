@@ -19,5 +19,5 @@ export default async function ScriptPage({
     if (fallback) redirect(`/${slug}/room/${fallback}`);
     return <EmptyState label="The script" />;
   }
-  return <DocumentSectionView documents={documents} />;
+  return <DocumentSectionView documents={documents} monospace />;
 }
