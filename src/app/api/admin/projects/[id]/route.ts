@@ -1,8 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Currency } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin, hashPassword } from "@/lib/auth";
 import { projectUpdateSchema } from "@/lib/validation";
 import { deleteObject } from "@/lib/storage";
+import { bigIntMinorToNumber, parseMoneyMajorToMinor } from "@/lib/money";
+
+// Prisma returns Project.grossBudget/equitySought/minimumTicket and each
+// FinanceSource.amount as BigInt — JSON.stringify throws on a bare BigInt,
+// so every response that includes these has to convert them to plain
+// numbers first (always safe for a film budget — see schema.prisma).
+function serializeProject<
+  T extends {
+    grossBudget: bigint | null;
+    equitySought: bigint | null;
+    minimumTicket: bigint | null;
+    financeSources?: { amount: bigint }[];
+  },
+>(project: T) {
+  return {
+    ...project,
+    grossBudget: bigIntMinorToNumber(project.grossBudget),
+    equitySought: bigIntMinorToNumber(project.equitySought),
+    minimumTicket: bigIntMinorToNumber(project.minimumTicket),
+    ...(project.financeSources
+      ? {
+          financeSources: project.financeSources.map((s) => ({
+            ...s,
+            amount: bigIntMinorToNumber(s.amount),
+          })),
+        }
+      : {}),
+  };
+}
 
 export async function GET(
   _request: NextRequest,
@@ -18,6 +48,7 @@ export async function GET(
       documents: { orderBy: { order: "asc" } },
       gallery: { orderBy: { order: "asc" } },
       references: { orderBy: { order: "asc" } },
+      financeSources: { orderBy: { order: "asc" } },
       _count: { select: { downloads: true } },
     },
   });
@@ -26,7 +57,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  return NextResponse.json({ project });
+  return NextResponse.json({ project: serializeProject(project) });
 }
 
 export async function PATCH(
@@ -60,6 +91,18 @@ export async function PATCH(
     }
   }
 
+  // Finance fields ("" clears a field, undefined leaves it alone — same
+  // convention as tagline/accentColor above) are major-unit decimal
+  // strings from the form; parseMoneyMajorToMinor returns null for "" and
+  // for anything that fails validation, but the zod schema above has
+  // already rejected anything malformed, so null here only ever means
+  // "cleared".
+  const financeFieldsTouched =
+    data.currency !== undefined ||
+    data.grossBudget !== undefined ||
+    data.equitySought !== undefined ||
+    data.minimumTicket !== undefined;
+
   const project = await prisma.project.update({
     where: { id },
     data: {
@@ -90,6 +133,19 @@ export async function PATCH(
       ...(data.idealShootWindow !== undefined
         ? { idealShootWindow: data.idealShootWindow || null }
         : {}),
+      ...(data.currency !== undefined
+        ? { currency: (data.currency || null) as Currency | null }
+        : {}),
+      ...(data.grossBudget !== undefined
+        ? { grossBudget: toBigIntOrNull(data.grossBudget) }
+        : {}),
+      ...(data.equitySought !== undefined
+        ? { equitySought: toBigIntOrNull(data.equitySought) }
+        : {}),
+      ...(data.minimumTicket !== undefined
+        ? { minimumTicket: toBigIntOrNull(data.minimumTicket) }
+        : {}),
+      ...(financeFieldsTouched ? { financeUpdatedAt: new Date() } : {}),
       ...(data.password
         ? {
             passwordHash: await hashPassword(data.password),
@@ -101,7 +157,12 @@ export async function PATCH(
     },
   });
 
-  return NextResponse.json({ project });
+  return NextResponse.json({ project: serializeProject(project) });
+}
+
+function toBigIntOrNull(majorAmount: string): bigint | null {
+  const minor = parseMoneyMajorToMinor(majorAmount);
+  return minor === null ? null : BigInt(minor);
 }
 
 export async function DELETE(

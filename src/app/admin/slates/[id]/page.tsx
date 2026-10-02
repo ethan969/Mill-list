@@ -41,6 +41,10 @@ export default async function SlateEditPage({
       order: sp.order,
       project: sp.project,
     })),
+    recoupmentStructure: slate.recoupmentStructure,
+    recoupmentNote: slate.recoupmentNote,
+    disclaimerText: slate.disclaimerText,
+    financeDisplayCurrency: slate.financeDisplayCurrency,
   };
 
   return <SlateEditClient initialSlate={initialSlate} />;

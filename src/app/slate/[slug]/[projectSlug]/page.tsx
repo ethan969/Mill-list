@@ -10,6 +10,10 @@ import ThemeWrapper from "@/components/ThemeWrapper";
 import PosterImage from "@/components/landing/PosterImage";
 import SlateExitButton from "@/components/slate/SlateExitButton";
 import DocumentSectionView from "@/components/DocumentSectionView";
+import CapitalStackChart from "@/components/slate/CapitalStackChart";
+import { calculateFilmFinance } from "@/lib/finance";
+import { CURRENCY_SYMBOLS, type CurrencyOption } from "@/lib/finance-options";
+import { formatMoneyMinorToMajor } from "@/lib/money";
 
 type TeamMember = { name: string; role?: string; bio?: string };
 
@@ -64,6 +68,12 @@ export default async function SlateFilmPage({
         aboutTeam: true,
         approximateBudget: true,
         idealShootWindow: true,
+        currency: true,
+        grossBudget: true,
+        equitySought: true,
+        minimumTicket: true,
+        financeUpdatedAt: true,
+        financeSources: { select: { amount: true, status: true } },
       },
     }),
     prisma.document.findFirst({
@@ -78,6 +88,20 @@ export default async function SlateFilmPage({
   const team = Array.isArray(project.aboutTeam)
     ? (project.aboutTeam as unknown as TeamMember[])
     : [];
+
+  // Only ever computed from data already fetched within this access-gated
+  // page — see requireSlateFilmAccess above — so there's nothing finance-
+  // related to leak for a non-member or unauthenticated request. Shown in
+  // the film's own currency; no FX conversion here (that's the slate
+  // Overview's job — see src/components/slate/SlateFinanceOverview.tsx).
+  const finance = calculateFilmFinance(
+    project.currency,
+    project.grossBudget !== null ? Number(project.grossBudget) : null,
+    project.financeSources.map((s) => ({ amount: Number(s.amount), status: s.status }))
+  );
+  const currencySymbol = project.currency
+    ? CURRENCY_SYMBOLS[project.currency as CurrencyOption]
+    : "";
 
   return (
     <ThemeWrapper
@@ -156,6 +180,63 @@ export default async function SlateFilmPage({
           </div>
         )}
 
+        {finance && (
+          <div className="rounded-lg border border-border bg-surface p-5 sm:p-6">
+            <h2 className="text-xs uppercase tracking-[0.25em] text-muted">
+              Finance
+            </h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {finance.budget !== null && (
+                <FinanceStat
+                  label="Budget"
+                  value={`${currencySymbol}${formatMoneyMinorToMajor(finance.budget)}`}
+                />
+              )}
+              <FinanceStat
+                label="% financed"
+                value={
+                  finance.percentFinanced !== null
+                    ? `${finance.percentFinanced.toFixed(1)}%`
+                    : "—"
+                }
+              />
+              {project.equitySought !== null && (
+                <FinanceStat
+                  label="Equity sought"
+                  value={`${currencySymbol}${formatMoneyMinorToMajor(Number(project.equitySought))}`}
+                />
+              )}
+              <FinanceStat
+                label="Minimum ticket"
+                value={
+                  project.minimumTicket !== null
+                    ? `${currencySymbol}${formatMoneyMinorToMajor(Number(project.minimumTicket))}`
+                    : "Contact us"
+                }
+              />
+            </div>
+            <div className="mt-5">
+              <CapitalStackChart
+                currencySymbol={currencySymbol}
+                committed={finance.committedTotal}
+                inNegotiation={finance.inNegotiationTotal}
+                sought={finance.soughtTotal}
+                budget={finance.budget}
+              />
+            </div>
+            {project.financeUpdatedAt && (
+              <p className="mt-4 text-[11px] text-muted">
+                Last updated{" "}
+                {project.financeUpdatedAt.toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            )}
+          </div>
+        )}
+
         {team.length > 0 && (
           <div>
             <h2 className="text-xs uppercase tracking-[0.25em] text-muted">
@@ -193,5 +274,14 @@ export default async function SlateFilmPage({
         </div>
       </main>
     </ThemeWrapper>
+  );
+}
+
+function FinanceStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-background/40 p-3">
+      <p className="text-[10px] uppercase tracking-[0.15em] text-muted">{label}</p>
+      <p className="mt-1 text-sm">{value}</p>
+    </div>
   );
 }
