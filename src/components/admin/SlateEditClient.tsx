@@ -7,6 +7,7 @@ import type { AdminSlate } from "@/components/admin/types";
 import SlateDetailsPanel from "@/components/admin/SlateDetailsPanel";
 import SlateFilmsPanel from "@/components/admin/SlateFilmsPanel";
 import SlateFilmDetailsPanel from "@/components/admin/SlateFilmDetailsPanel";
+import SlateFinancePanel from "@/components/admin/SlateFinancePanel";
 
 const FILM_TAB_PREFIX = "film:";
 
@@ -91,6 +92,16 @@ export default function SlateEditClient({
         >
           Films
         </button>
+        <button
+          onClick={() => setTab("finance")}
+          className={`whitespace-nowrap border-b-2 pb-3 transition-colors ${
+            tab === "finance"
+              ? "border-accent text-foreground"
+              : "border-transparent text-muted hover:text-foreground"
+          }`}
+        >
+          Finance
+        </button>
         {films.map((f) => {
           const key = `${FILM_TAB_PREFIX}${f.projectId}`;
           return (
@@ -114,6 +125,9 @@ export default function SlateEditClient({
           <SlateDetailsPanel slate={slate} onUpdate={onUpdate} />
         )}
         {tab === "films" && <SlateFilmsPanel slate={slate} onUpdate={onUpdate} />}
+        {tab === "finance" && (
+          <SlateFinancePanel slate={slate} onUpdate={onUpdate} />
+        )}
         {tab.startsWith(FILM_TAB_PREFIX) &&
           (activeFilm ? (
             <SlateFilmDetailsPanel

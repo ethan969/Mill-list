@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { RecoupmentStructure, Currency } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin, hashPassword } from "@/lib/auth";
 import { slateUpdateSchema } from "@/lib/validation";
@@ -78,6 +79,21 @@ export async function PATCH(
         : {}),
       ...(data.fontId !== undefined ? { fontId: data.fontId || null } : {}),
       ...(data.isPublished !== undefined ? { isPublished: data.isPublished } : {}),
+      ...(data.recoupmentStructure !== undefined
+        ? {
+            recoupmentStructure: (data.recoupmentStructure ||
+              null) as RecoupmentStructure | null,
+          }
+        : {}),
+      ...(data.recoupmentNote !== undefined
+        ? { recoupmentNote: data.recoupmentNote || null }
+        : {}),
+      ...(data.disclaimerText !== undefined
+        ? { disclaimerText: data.disclaimerText || null }
+        : {}),
+      ...(data.financeDisplayCurrency
+        ? { financeDisplayCurrency: data.financeDisplayCurrency as Currency }
+        : {}),
       ...(data.password
         ? {
             passwordHash: await hashPassword(data.password),

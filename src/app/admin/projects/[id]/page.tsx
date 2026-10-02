@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import ProjectEditClient from "@/components/admin/ProjectEditClient";
 import type { AdminProject } from "@/components/admin/types";
+import { bigIntMinorToNumber } from "@/lib/money";
 
 export default async function ProjectEditPage({
   params,
@@ -16,6 +17,7 @@ export default async function ProjectEditPage({
       documents: { orderBy: { order: "asc" } },
       gallery: { orderBy: { order: "asc" } },
       references: { orderBy: { order: "asc" } },
+      financeSources: { orderBy: { order: "asc" } },
       _count: { select: { downloads: true } },
     },
   });
@@ -66,6 +68,24 @@ export default async function ProjectEditPage({
       order: r.order,
     })),
     _count: { downloads: project._count.downloads },
+    currency: project.currency,
+    grossBudget: bigIntMinorToNumber(project.grossBudget),
+    equitySought: bigIntMinorToNumber(project.equitySought),
+    minimumTicket: bigIntMinorToNumber(project.minimumTicket),
+    financeUpdatedAt: project.financeUpdatedAt
+      ? project.financeUpdatedAt.toISOString()
+      : null,
+    financeSources: project.financeSources.map((s) => ({
+      id: s.id,
+      name: s.name,
+      type: s.type,
+      amount: bigIntMinorToNumber(s.amount)!,
+      status: s.status,
+      recoups: s.recoups,
+      recoupmentPosition: s.recoupmentPosition,
+      recoupmentPremiumBps: s.recoupmentPremiumBps,
+      order: s.order,
+    })),
   };
 
   return <ProjectEditClient initialProject={initialProject} />;
