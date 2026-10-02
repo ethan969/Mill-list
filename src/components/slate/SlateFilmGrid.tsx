@@ -1,5 +1,8 @@
 import SlateFilmCard, { type SlateFilm } from "@/components/slate/SlateFilmCard";
 import SlateExitButton from "@/components/slate/SlateExitButton";
+import SlateFinanceOverview, {
+  type SlateFinanceData,
+} from "@/components/slate/SlateFinanceOverview";
 
 export default function SlateFilmGrid({
   slug,
@@ -7,12 +10,14 @@ export default function SlateFilmGrid({
   overview,
   aboutContent,
   films,
+  finance,
 }: {
   slug: string;
   title: string;
   overview: string | null;
   aboutContent: string | null;
   films: SlateFilm[];
+  finance: SlateFinanceData | null;
 }) {
   const aboutParagraphs = (aboutContent || "")
     .split(/\n\s*\n/)
@@ -46,6 +51,8 @@ export default function SlateFilmGrid({
             ))}
           </div>
         )}
+
+        {finance && <SlateFinanceOverview slug={slug} finance={finance} />}
 
         {films.length === 0 ? (
           <p className="text-sm text-muted">
