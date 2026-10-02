@@ -77,8 +77,18 @@ let secretTeamMemberName: string;
 let projectTitle: string;
 let otherSlateId: string;
 let otherSlateSlug: string;
+let secretSourceName: string;
+let secretRecoupmentNote: string;
+let secretDisclaimerText: string;
+let fxRateId: string;
 const SLATE_PASSWORD = "slate-integration-test-password";
 const OTHER_SLATE_PASSWORD = "other-slate-integration-test-password";
+// The member project's own currency is GBP; the slate's finance display
+// currency is USD, converted via the 1.25 FxRate row created below — so a
+// figure appearing in GBP (own-currency, per-film page) vs. USD (converted,
+// slate Overview) also proves the two pages never mix currencies.
+const COMMITTED_SOURCE_AMOUNT_MINOR = 123456; // "1234.56" GBP
+const COMMITTED_SOURCE_AMOUNT_CONVERTED = "1543.20"; // 1234.56 * 1.25 USD
 
 beforeAll(async () => {
   slug = `room-gate-test-${crypto.randomUUID()}`;
@@ -99,6 +109,10 @@ beforeAll(async () => {
   secretTeamMemberName = `Jane Doe ${rand}`;
   projectTitle = `Secret Project ${rand}`;
 
+  secretSourceName = `SECRET-SOURCE-${rand}`;
+  secretRecoupmentNote = `SECRET-RECOUPMENT-NOTE-${rand}`;
+  secretDisclaimerText = `SECRET-DISCLAIMER-${rand}`;
+
   const project = await prisma.project.create({
     data: {
       slug,
@@ -111,9 +125,27 @@ beforeAll(async () => {
       logline: secretLogline,
       approximateBudget: "$2M - $4M",
       idealShootWindow: "Spring 2026",
+      currency: "GBP",
+      grossBudget: BigInt(500_000_00),
+      equitySought: BigInt(100_000_00),
+      minimumTicket: BigInt(5_000_00),
+      financeUpdatedAt: new Date(),
+      financeSources: {
+        create: {
+          name: secretSourceName,
+          type: "EQUITY",
+          amount: BigInt(COMMITTED_SOURCE_AMOUNT_MINOR),
+          status: "COMMITTED",
+        },
+      },
     },
   });
   projectId = project.id;
+
+  const fxRate = await prisma.fxRate.create({
+    data: { from: "GBP", to: "USD", rate: "1.25", asOfDate: new Date() },
+  });
+  fxRateId = fxRate.id;
 
   // A real project that exists but is never added to the slate below —
   // used to confirm the slate film page 404s for a non-member rather than
@@ -160,6 +192,10 @@ beforeAll(async () => {
       title: `Secret Slate ${rand}`,
       passwordHash: await bcrypt.hash(SLATE_PASSWORD, 12),
       isPublished: true,
+      financeDisplayCurrency: "USD",
+      recoupmentStructure: "RING_FENCED",
+      recoupmentNote: secretRecoupmentNote,
+      disclaimerText: secretDisclaimerText,
     },
   });
   slateId = slate.id;
@@ -221,8 +257,12 @@ afterAll(async () => {
   // SlateProject also references projectId.
   await prisma.slate.delete({ where: { id: slateId } }).catch(() => {});
   await prisma.slate.delete({ where: { id: otherSlateId } }).catch(() => {});
+  // FinanceSource rows cascade-delete with their Project (onDelete:
+  // Cascade in schema.prisma) — only the standalone FxRate needs its own
+  // cleanup here.
   await prisma.project.delete({ where: { id: projectId } }).catch(() => {});
   await prisma.project.delete({ where: { id: nonMemberProjectId } }).catch(() => {});
+  await prisma.fxRate.delete({ where: { id: fxRateId } }).catch(() => {});
 });
 
 describe("proxy room gate: every room route, three invalid-session states", () => {
@@ -364,6 +404,14 @@ function slateFilmSecrets(): string[] {
     secretDocTitles.CREATIVE_DECK,
     "$2M - $4M",
     "Spring 2026",
+    // Finance data — the per-film page's own-currency committed amount,
+    // the slate Overview's converted equivalent (proves the aggregate
+    // figures aren't somehow computed/cached pre-auth either), and the
+    // slate's recoupment/disclaimer copy.
+    "1234.56",
+    COMMITTED_SOURCE_AMOUNT_CONVERTED,
+    secretRecoupmentNote,
+    secretDisclaimerText,
   ];
 }
 
@@ -480,6 +528,21 @@ describe("the slate's own gate/landing page (src/app/slate/[slug])", () => {
     expect(body).toContain("Exit slate");
     expect(body).toContain(projectTitle);
   });
+
+  it("shows the Finance panel, converted to the slate's display currency, for a valid cookie", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}`, {
+      redirect: "manual",
+      headers: { cookie: await currentSlateCookie() },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    // Converted (USD) figures, not the project's own GBP amount.
+    expect(body).toContain(COMMITTED_SOURCE_AMOUNT_CONVERTED);
+    expect(body).not.toContain("1234.56");
+    expect(body).toContain("Ring-fenced");
+    expect(body).toContain(secretRecoupmentNote);
+    expect(body).toContain(secretDisclaimerText);
+  });
 });
 
 describe("a film's dedicated slate page (src/app/slate/[slug]/[projectSlug])", () => {
@@ -562,6 +625,18 @@ describe("a film's dedicated slate page (src/app/slate/[slug]/[projectSlug])", (
     // Not the full multi-tab room — its own nav ("Exit room", section
     // tabs) never appears here.
     expect(body).not.toContain("Exit room");
+  });
+
+  it("shows this film's own Finance section, in its own currency (not converted)", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${slug}`, {
+      redirect: "manual",
+      headers: { cookie: await currentSlateCookie() },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    // Own-currency (GBP) figure, not the slate Overview's USD conversion.
+    expect(body).toContain("1234.56");
+    expect(body).not.toContain(COMMITTED_SOURCE_AMOUNT_CONVERTED);
   });
 
   it("404s for a real project that isn't a member of this slate, once authenticated — and never leaks its title via <title>", async () => {
