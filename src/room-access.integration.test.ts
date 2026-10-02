@@ -74,7 +74,11 @@ let nonMemberProjectId: string;
 let nonMemberSlug: string;
 let secretLogline: string;
 let secretTeamMemberName: string;
+let projectTitle: string;
+let otherSlateId: string;
+let otherSlateSlug: string;
 const SLATE_PASSWORD = "slate-integration-test-password";
+const OTHER_SLATE_PASSWORD = "other-slate-integration-test-password";
 
 beforeAll(async () => {
   slug = `room-gate-test-${crypto.randomUUID()}`;
@@ -93,11 +97,12 @@ beforeAll(async () => {
 
   secretLogline = `SECRET-LOGLINE-${rand}`;
   secretTeamMemberName = `Jane Doe ${rand}`;
+  projectTitle = `Secret Project ${rand}`;
 
   const project = await prisma.project.create({
     data: {
       slug,
-      title: `Secret Project ${rand}`,
+      title: projectTitle,
       productionCompany: "Secret Co",
       passwordHash: "unused-in-this-test",
       isPublished: true,
@@ -160,6 +165,20 @@ beforeAll(async () => {
   slateId = slate.id;
   await prisma.slateProject.create({ data: { slateId, projectId } });
 
+  // A second, unrelated slate — never includes projectId — used to confirm
+  // a valid cookie for one slate can't be replayed against another's gate
+  // or per-film pages.
+  otherSlateSlug = `other-slate-gate-test-${crypto.randomUUID()}`;
+  const otherSlate = await prisma.slate.create({
+    data: {
+      slug: otherSlateSlug,
+      title: `Other Slate ${rand}`,
+      passwordHash: await bcrypt.hash(OTHER_SLATE_PASSWORD, 12),
+      isPublished: true,
+    },
+  });
+  otherSlateId = otherSlate.id;
+
   secrets = [secretAbout, secretBio, secretCaption, secretReference, ...Object.values(secretDocTitles)];
 
   // Build fresh so the server under test reflects the current source tree,
@@ -201,6 +220,7 @@ afterAll(async () => {
   // slate-level document; must run before the project delete below, since
   // SlateProject also references projectId.
   await prisma.slate.delete({ where: { id: slateId } }).catch(() => {});
+  await prisma.slate.delete({ where: { id: otherSlateId } }).catch(() => {});
   await prisma.project.delete({ where: { id: projectId } }).catch(() => {});
   await prisma.project.delete({ where: { id: nonMemberProjectId } }).catch(() => {});
 });
@@ -332,27 +352,200 @@ describe("slate access via a real server (the one case that can't be unit-tested
   });
 });
 
-describe("a film's dedicated slate page (src/app/slate/[slug]/[projectSlug])", () => {
-  async function slateCookie(): Promise<string> {
-    const current = await prisma.slate.findUniqueOrThrow({ where: { id: slateId } });
-    const { signSlateToken } = await import("@/lib/slate-token");
-    const token = await signSlateToken(slateId, slateSlug, current.sessionVersion);
-    return `slate_${slateSlug}=${token}`;
-  }
+// Everything a slate visitor shouldn't see before a valid, current-version
+// session for *this* slate: the member film's own title, logline, team,
+// budget/shoot-window, and its deck's document title. Checked against both
+// the gate page and the per-film page in every invalid-session state below.
+function slateFilmSecrets(): string[] {
+  return [
+    projectTitle,
+    secretLogline,
+    secretTeamMemberName,
+    secretDocTitles.CREATIVE_DECK,
+    "$2M - $4M",
+    "Spring 2026",
+  ];
+}
 
-  it("redirects to the slate's gate page with no slate session", async () => {
+async function currentSlateCookie(): Promise<string> {
+  const current = await prisma.slate.findUniqueOrThrow({ where: { id: slateId } });
+  const { signSlateToken } = await import("@/lib/slate-token");
+  const token = await signSlateToken(slateId, slateSlug, current.sessionVersion);
+  return `slate_${slateSlug}=${token}`;
+}
+
+async function expiredSlateCookie(): Promise<string> {
+  const { SignJWT } = await import("jose");
+  const secretBytes = new TextEncoder().encode(secretValue);
+  const now = Math.floor(Date.now() / 1000);
+  const token = await new SignJWT({
+    kind: "slate",
+    slateId,
+    slug: slateSlug,
+    sessionVersion: 1,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt(now - 1000)
+    .setExpirationTime(now - 500)
+    .sign(secretBytes);
+  return `slate_${slateSlug}=${token}`;
+}
+
+/**
+ * A token correctly signed for the *other* slate, but placed under this
+ * slate's cookie name (slate_<slateSlug>) — simulates a cookie value
+ * copy-pasted from one slate session into another's slot. verifySlateToken
+ * checks the payload's own embedded slug against the name-derived slug, so
+ * this must be rejected exactly like no cookie at all.
+ */
+async function otherSlateCookieUnderThisName(): Promise<string> {
+  const { signSlateToken } = await import("@/lib/slate-token");
+  const token = await signSlateToken(otherSlateId, otherSlateSlug, 1);
+  return `slate_${slateSlug}=${token}`;
+}
+
+describe("the slate's own gate/landing page (src/app/slate/[slug])", () => {
+  it("shows the password gate, not the film grid, with no cookie", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}`, { redirect: "manual" });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Enter password");
+    expect(body).not.toContain("Exit slate");
+    for (const s of slateFilmSecrets()) {
+      expect(body, `no cookie leaked "${s}"`).not.toContain(s);
+    }
+  });
+
+  it("shows the gate, leaking nothing, with an expired cookie", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}`, {
+      redirect: "manual",
+      headers: { cookie: await expiredSlateCookie() },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Enter password");
+    expect(body).not.toContain("Exit slate");
+    for (const s of slateFilmSecrets()) {
+      expect(body, `expired cookie leaked "${s}"`).not.toContain(s);
+    }
+  });
+
+  it("shows the gate, leaking nothing, with a revoked (sessionVersion-bumped) cookie", async () => {
+    // Signed while sessionVersion was 1 (or whatever it currently is),
+    // then explicitly revoked — simulates a password change or an
+    // explicit "revoke sessions" click happening after this cookie was
+    // already issued.
+    const { signSlateToken } = await import("@/lib/slate-token");
+    const current = await prisma.slate.findUniqueOrThrow({ where: { id: slateId } });
+    const staleToken = await signSlateToken(slateId, slateSlug, current.sessionVersion);
+    await prisma.slate.update({
+      where: { id: slateId },
+      data: { sessionVersion: { increment: 1 } },
+    });
+
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}`, {
+      redirect: "manual",
+      headers: { cookie: `slate_${slateSlug}=${staleToken}` },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Enter password");
+    expect(body).not.toContain("Exit slate");
+    for (const s of slateFilmSecrets()) {
+      expect(body, `revoked cookie leaked "${s}"`).not.toContain(s);
+    }
+  });
+
+  it("shows the gate, leaking nothing, with another slate's cookie", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}`, {
+      redirect: "manual",
+      headers: { cookie: await otherSlateCookieUnderThisName() },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Enter password");
+    expect(body).not.toContain("Exit slate");
+    for (const s of slateFilmSecrets()) {
+      expect(body, `other-slate cookie leaked "${s}"`).not.toContain(s);
+    }
+  });
+
+  it("shows the real film grid for a valid, current-version cookie", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}`, {
+      redirect: "manual",
+      headers: { cookie: await currentSlateCookie() },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Exit slate");
+    expect(body).toContain(projectTitle);
+  });
+});
+
+describe("a film's dedicated slate page (src/app/slate/[slug]/[projectSlug])", () => {
+  it("redirects to the slate's gate page with no slate session, leaking nothing", async () => {
     const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${slug}`, {
       redirect: "manual",
     });
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe(`/slate/${slateSlug}`);
+    const body = await res.text();
+    for (const s of slateFilmSecrets()) {
+      expect(body, `no cookie leaked "${s}"`).not.toContain(s);
+    }
+  });
+
+  it("redirects with an expired cookie, leaking nothing", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${slug}`, {
+      redirect: "manual",
+      headers: { cookie: await expiredSlateCookie() },
+    });
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe(`/slate/${slateSlug}`);
+    const body = await res.text();
+    for (const s of slateFilmSecrets()) {
+      expect(body, `expired cookie leaked "${s}"`).not.toContain(s);
+    }
+  });
+
+  it("redirects with a revoked (sessionVersion-bumped) cookie, leaking nothing", async () => {
+    const { signSlateToken } = await import("@/lib/slate-token");
+    const current = await prisma.slate.findUniqueOrThrow({ where: { id: slateId } });
+    const staleToken = await signSlateToken(slateId, slateSlug, current.sessionVersion);
+    await prisma.slate.update({
+      where: { id: slateId },
+      data: { sessionVersion: { increment: 1 } },
+    });
+
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${slug}`, {
+      redirect: "manual",
+      headers: { cookie: `slate_${slateSlug}=${staleToken}` },
+    });
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe(`/slate/${slateSlug}`);
+    const body = await res.text();
+    for (const s of slateFilmSecrets()) {
+      expect(body, `revoked cookie leaked "${s}"`).not.toContain(s);
+    }
+  });
+
+  it("redirects with another slate's cookie, leaking nothing", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${slug}`, {
+      redirect: "manual",
+      headers: { cookie: await otherSlateCookieUnderThisName() },
+    });
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe(`/slate/${slateSlug}`);
+    const body = await res.text();
+    for (const s of slateFilmSecrets()) {
+      expect(body, `other-slate cookie leaked "${s}"`).not.toContain(s);
+    }
   });
 
   it("shows logline, budget, shoot window, team and the embedded deck for a member film", async () => {
-    const cookie = await slateCookie();
     const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${slug}`, {
       redirect: "manual",
-      headers: { cookie },
+      headers: { cookie: await currentSlateCookie() },
     });
     expect(res.status).toBe(200);
     const body = await res.text();
@@ -371,12 +564,29 @@ describe("a film's dedicated slate page (src/app/slate/[slug]/[projectSlug])", (
     expect(body).not.toContain("Exit room");
   });
 
-  it("404s for a real project that isn't a member of this slate", async () => {
-    const cookie = await slateCookie();
+  it("404s for a real project that isn't a member of this slate, once authenticated — and never leaks its title via <title>", async () => {
     const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${nonMemberSlug}`, {
       redirect: "manual",
-      headers: { cookie },
+      headers: { cookie: await currentSlateCookie() },
     });
     expect(res.status).toBe(404);
+    const body = await res.text();
+    // generateMetadata runs the same access check as the page body
+    // (resolveSlateFilmAccess) — confirms it doesn't independently leak
+    // the real project title into <head> just because this project
+    // exists, regardless of the 404 the body itself renders.
+    expect(body).not.toContain("Non-Member Project");
+  });
+
+  it("redirects for a non-member film slug with *no* cookie at all — never a distinguishable 404 (no enumeration of slate membership pre-auth)", async () => {
+    const res = await fetch(`${BASE_URL}/slate/${slateSlug}/${nonMemberSlug}`, {
+      redirect: "manual",
+    });
+    // Must match the no-cookie *member*-film case exactly (307 to the
+    // gate) — if this were ever 404 instead, an unauthenticated visitor
+    // could tell membership apart from non-membership (or a made-up slug)
+    // without ever knowing the password.
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe(`/slate/${slateSlug}`);
   });
 });

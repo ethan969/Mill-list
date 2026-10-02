@@ -2,7 +2,10 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireSlateFilmAccess } from "@/lib/require-slate-film-access";
+import {
+  requireSlateFilmAccess,
+  resolveSlateFilmAccess,
+} from "@/lib/require-slate-film-access";
 import ThemeWrapper from "@/components/ThemeWrapper";
 import PosterImage from "@/components/landing/PosterImage";
 import SlateExitButton from "@/components/slate/SlateExitButton";
@@ -15,9 +18,17 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string; projectSlug: string }>;
 }): Promise<Metadata> {
-  const { projectSlug } = await params;
+  const { slug, projectSlug } = await params;
+  // Same access check as the page body (resolveSlateFilmAccess, shared
+  // with requireSlateFilmAccess below) — without it, the real film title
+  // would render in <head> (and the RSC flight payload) independently of
+  // whether the page body goes on to redirect or 404, including before
+  // authentication.
+  const result = await resolveSlateFilmAccess(slug, projectSlug);
+  if (!result.ok) return {};
+
   const project = await prisma.project.findUnique({
-    where: { slug: projectSlug },
+    where: { id: result.projectId },
     select: { title: true },
   });
   if (!project) return {};
