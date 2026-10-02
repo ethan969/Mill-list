@@ -19,10 +19,10 @@ model AdminUser {
   /// is what actually gates whether 2FA is required at login.
   totpSecretEncrypted String?
   /// Null until the admin confirms enrollment with a valid code.
-  totpEnabledAt        DateTime?
+  totpEnabledAt       DateTime?
   /// The most recent TOTP time-step successfully consumed, so a code
   /// can't be replayed within its own validity window.
-  totpLastUsedStep     Int?
+  totpLastUsedStep    Int?
 
   recoveryCodes AdminRecoveryCode[]
 }
@@ -52,9 +52,37 @@ enum GalleryItemType {
   VIDEO
 }
 
+enum Currency {
+  GBP
+  USD
+  EUR
+}
+
+enum FinanceSourceType {
+  EQUITY
+  BFI
+  TAX_CREDIT
+  PRESALE
+  GAP
+  DEBT
+  SOFT_MONEY
+  OTHER
+}
+
+enum FinanceSourceStatus {
+  COMMITTED
+  IN_NEGOTIATION
+  SOUGHT
+}
+
+enum RecoupmentStructure {
+  RING_FENCED
+  CROSS_COLLATERALISED
+}
+
 model Project {
-  id                String   @id @default(cuid())
-  slug              String   @unique
+  id                String    @id @default(cuid())
+  slug              String    @unique
   title             String
   productionCompany String
   tagline           String?
@@ -63,18 +91,18 @@ model Project {
   posterMimeType    String?
   logoKey           String?
   logoMimeType      String?
-  themeId           String   @default("midnight-gold")
+  themeId           String    @default("midnight-gold")
   accentColor       String?
   fontId            String?
-  landingLayout     String   @default("centered")
-  roomLayout        String   @default("top-nav")
+  landingLayout     String    @default("centered")
+  roomLayout        String    @default("top-nav")
   passwordHash      String
   /// Bumped whenever the room password changes or an admin explicitly
   /// revokes viewer sessions — every room JWT carries the version it was
   /// issued under (src/lib/auth.ts), so bumping this invalidates every
   /// cookie issued before the bump without needing a session store.
-  sessionVersion    Int      @default(1)
-  isPublished       Boolean  @default(false)
+  sessionVersion    Int       @default(1)
+  isPublished       Boolean   @default(false)
   aboutContent      String?
   aboutTeam         Json?
   /// Shown on this film's dedicated page within a slate (src/app/slate/
@@ -83,16 +111,67 @@ model Project {
   approximateBudget String?
   /// Same slate-film-page-only use as approximateBudget, e.g. "Spring 2026".
   idealShootWindow  String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  /// All of currency/grossBudget/equitySought/minimumTicket/financeSources
+  /// below are additive finance tracking, independent of the free-text
+  /// approximateBudget above — see src/lib/finance.ts for the calculations
+  /// and src/app/slate/[slug] for where they're shown. Nullable/empty
+  /// until an admin fills in finance details for this film.
+  currency          Currency?
+  /// Minor units (e.g. pence, cents) — see src/lib/finance.ts for why, and
+  /// for the BigInt<->number boundary (always safe for any realistic film
+  /// budget; stored as BigInt purely so the database column itself can
+  /// never silently overflow the way a 32-bit Int could).
+  grossBudget       BigInt?
+  equitySought      BigInt?
+  /// Optional per spec — a slate's finance panel can show "contact us" in
+  /// its place rather than treating an unset minimum as zero.
+  minimumTicket     BigInt?
+  financeUpdatedAt  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  documents  Document[]
-  gallery    GalleryItem[]
-  references ReferenceLink[]
-  downloads  DocumentDownload[]
-  slates     SlateProject[]
+  documents      Document[]
+  gallery        GalleryItem[]
+  references     ReferenceLink[]
+  downloads      DocumentDownload[]
+  slates         SlateProject[]
+  financeSources FinanceSource[]
 
   @@index([slug])
+}
+
+/// One line item in a film's capital stack — see src/lib/finance.ts for
+/// how a Project's FinanceSource rows roll up into totals and a per-status
+/// breakdown. All amounts are in that Project's own Project.currency;
+/// there's no per-source currency, since a single film's financing is
+/// realistically tracked in one currency throughout.
+model FinanceSource {
+  id                   String              @id @default(cuid())
+  projectId            String
+  project              Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name                 String
+  type                 FinanceSourceType
+  /// Minor units, same convention as Project.grossBudget.
+  amount               BigInt
+  status               FinanceSourceStatus
+  recoups              Boolean             @default(true)
+  /// Lower recoups earlier (1st position, 2nd position, ...) in a ranked
+  /// waterfall. Null when this source doesn't participate in one (e.g. it
+  /// doesn't recoup at all, or recoups pari passu with everything else at
+  /// its tier — this model doesn't represent tiers, only a single ordinal
+  /// rank, which is enough for display but not a substitute for the real
+  /// legal waterfall in a film's finance documents).
+  recoupmentPosition   Int?
+  /// Basis points (1% = 100bps), not a float — same reasoning as storing
+  /// money in minor units: a premium like "20%" needs to stay exact
+  /// through display and any future calculation, which a float percentage
+  /// (0.2) can't guarantee bit-for-bit.
+  recoupmentPremiumBps Int?
+  order                Int                 @default(0)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([projectId])
 }
 
 /// A curated, password-protected collection of existing Projects, browsable
@@ -104,38 +183,73 @@ model Project {
 /// linked to directly, its room) via live membership checks, rather than
 /// duplicating each project's own password.
 model Slate {
-  id             String   @id @default(cuid())
-  slug           String   @unique
-  title          String
+  id                     String               @id @default(cuid())
+  slug                   String               @unique
+  title                  String
   /// Short teaser shown even before the password gate is passed (like a
   /// project's tagline). aboutContent below is the longer production-
   /// company intro shown only once inside the slate.
-  overview       String?
+  overview               String?
   /// The slate's own intro/"about us" page, shown once authenticated,
   /// above the film grid — same paragraph-per-blank-line convention as
   /// Project.aboutContent.
-  aboutContent   String?
-  themeId        String   @default("midnight-gold")
-  accentColor    String?
-  fontId         String?
-  passwordHash   String
+  aboutContent           String?
+  themeId                String               @default("midnight-gold")
+  accentColor            String?
+  fontId                 String?
+  passwordHash           String
   /// Same draft/live meaning as Project.isPublished: the public
   /// /slate/[slug] page 404s while this is false, even with a valid
   /// password. Defaults to false so a newly created slate isn't reachable
   /// until an admin explicitly publishes it.
-  isPublished    Boolean  @default(false)
+  isPublished            Boolean              @default(false)
   /// Same invalidation pattern as Project.sessionVersion — bumped on a
   /// password change or an explicit revoke; every slate JWT carries the
   /// version it was issued under (src/lib/slate-token.ts).
-  sessionVersion Int      @default(1)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  sessionVersion         Int                  @default(1)
+  /// How member films' capital stacks relate to each other financially —
+  /// shown as a plain-language statement on the Finance panel alongside
+  /// recoupmentNote. Null (and the panel's recoupment statement omitted)
+  /// until an admin sets it; this is disclosure copy, not something the
+  /// app enforces or calculates from.
+  recoupmentStructure    RecoupmentStructure?
+  /// Explains recoupmentStructure above in plain language — e.g. which
+  /// films are cross-collateralised with which, or why they're ring-fenced.
+  recoupmentNote         String?
+  disclaimerText         String?
+  /// The currency slate-level finance totals (src/lib/finance.ts) are
+  /// converted to and shown in. Not in the original spec's field list for
+  /// Slate — added because "converted to the slate's display currency" in
+  /// the calculations requirement names a field that has to live
+  /// somewhere; defaulted to GBP absent any other signal to pick from.
+  financeDisplayCurrency Currency             @default(GBP)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 
   projects  SlateProject[]
   documents Document[]
   downloads DocumentDownload[]
 
   @@index([slug])
+}
+
+/// A single exchange rate snapshot, multiplying 1 unit of `from` into
+/// `rate` units of `to` — e.g. from: USD, to: GBP, rate: 0.79 means 1 USD
+/// = 0.79 GBP. Rows accumulate over time (asOfDate); src/lib/finance.ts
+/// always looks up the most recent row for a given (from, to) pair rather
+/// than assuming there's only ever one. See that file for why a missing
+/// rate is a reported error state, never a guessed/defaulted conversion.
+model FxRate {
+  id       String   @id @default(cuid())
+  from     Currency
+  to       Currency
+  /// An exact decimal (backed by Prisma.Decimal / decimal.js →  Postgres
+  /// NUMERIC), not a float — this multiplies integer minor-unit money
+  /// amounts, and a binary float rate couldn't guarantee that stays exact.
+  rate     Decimal  @db.Decimal(18, 8)
+  asOfDate DateTime
+
+  @@index([from, to, asOfDate])
 }
 
 /// Which Projects a Slate currently includes, and in what order to list
@@ -163,23 +277,23 @@ model SlateProject {
 /// (Prisma's schema DSL doesn't express arbitrary CHECK constraints, so
 /// it's appended as raw SQL there) rather than by application code alone.
 model Document {
-  id        String           @id @default(cuid())
-  projectId String?
-  project   Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slateId   String?
-  slate     Slate?           @relation(fields: [slateId], references: [id], onDelete: Cascade)
-  section   DocumentSection
-  title     String
-  fileKey   String
-  fileName  String          @default("document.pdf")
-  mimeType  String          @default("application/pdf")
-  fileSize  Int?
-  pageCount Int?
+  id         String          @id @default(cuid())
+  projectId  String?
+  project    Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slateId    String?
+  slate      Slate?          @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  section    DocumentSection
+  title      String
+  fileKey    String
+  fileName   String          @default("document.pdf")
+  mimeType   String          @default("application/pdf")
+  fileSize   Int?
+  pageCount  Int?
   pageWidth  Float?
   pageHeight Float?
-  order     Int             @default(0)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  order      Int             @default(0)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
 
   downloads DocumentDownload[]
 
@@ -223,19 +337,19 @@ model ReferenceLink {
 /// and which slate the access came through), while downloading a
 /// slate-level document records only slateId.
 model DocumentDownload {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
   projectId  String?
-  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slateId    String?
-  slate      Slate?    @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  slate      Slate?   @relation(fields: [slateId], references: [id], onDelete: Cascade)
   documentId String
-  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   email      String
-  emailSent  Boolean   @default(false)
-  linkOpened Boolean   @default(false)
+  emailSent  Boolean  @default(false)
+  linkOpened Boolean  @default(false)
   ip         String?
   userAgent  String?
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([projectId])
   @@index([slateId])
