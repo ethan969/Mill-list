@@ -49,19 +49,19 @@ async function main() {
     "Double-check that's the PREVIEW database before passing --yes — this script has no way to tell preview and production apart on its own."
   );
 
-  const admin = await prisma.adminUser.findUnique({
+  const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
     include: { recoveryCodes: true },
   });
 
-  if (!admin) {
+  if (!user) {
     throw new Error(`No admin user found for ${email} on this database.`);
   }
 
-  console.log(`\nAccount: ${admin.email} (id ${admin.id})`);
-  console.log(`  2FA enrolled: ${admin.totpEnabledAt ? `yes, since ${admin.totpEnabledAt.toISOString()}` : "no"}`);
-  console.log(`  TOTP secret stored: ${admin.totpSecretEncrypted ? "yes" : "no"}`);
-  console.log(`  Recovery codes: ${admin.recoveryCodes.length} (${admin.recoveryCodes.filter((c) => !c.usedAt).length} unused)`);
+  console.log(`\nAccount: ${user.email} (id ${user.id})`);
+  console.log(`  2FA enrolled: ${user.totpEnabledAt ? `yes, since ${user.totpEnabledAt.toISOString()}` : "no"}`);
+  console.log(`  TOTP secret stored: ${user.totpSecretEncrypted ? "yes" : "no"}`);
+  console.log(`  Recovery codes: ${user.recoveryCodes.length} (${user.recoveryCodes.filter((c) => !c.usedAt).length} unused)`);
 
   if (!confirmed) {
     console.log("\nDry run only — no changes made. Re-run with --yes to apply the reset above.");
@@ -69,18 +69,18 @@ async function main() {
   }
 
   await prisma.$transaction([
-    prisma.adminUser.update({
-      where: { id: admin.id },
+    prisma.user.update({
+      where: { id: user.id },
       data: {
         totpSecretEncrypted: null,
         totpEnabledAt: null,
         totpLastUsedStep: null,
       },
     }),
-    prisma.adminRecoveryCode.deleteMany({ where: { adminId: admin.id } }),
+    prisma.adminRecoveryCode.deleteMany({ where: { userId: user.id } }),
   ]);
 
-  console.log(`\n2FA reset for ${admin.email}. They'll be asked to enroll again on next login.`);
+  console.log(`\n2FA reset for ${user.email}. They'll be asked to enroll again on next login.`);
 }
 
 main()

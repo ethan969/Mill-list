@@ -36,7 +36,7 @@ export type TotpCheck = { valid: true; step: number } | { valid: false };
  * already been consumed. A bare TOTP.validate() call alone would accept
  * the same still-within-its-30s-window code twice; `lastUsedStep` is
  * whatever was last returned here as `step`, persisted by the caller
- * (AdminUser.totpLastUsedStep) so a captured code can't be replayed.
+ * (User.totpLastUsedStep) so a captured code can't be replayed.
  */
 export function verifyAndConsumeTotp(
   secret: string,
@@ -140,11 +140,11 @@ export async function verifyRecoveryCode(code: string, hash: string): Promise<bo
 }
 
 /** Generates, hashes and stores a fresh set of recovery codes, returning the plaintext codes to show the admin once. */
-export async function createRecoveryCodesForAdmin(adminId: string): Promise<string[]> {
+export async function createRecoveryCodesForAdmin(userId: string): Promise<string[]> {
   const codes = generateRecoveryCodes();
   await prisma.adminRecoveryCode.createMany({
     data: await Promise.all(
-      codes.map(async (code) => ({ adminId, codeHash: await hashRecoveryCode(code) }))
+      codes.map(async (code) => ({ userId, codeHash: await hashRecoveryCode(code) }))
     ),
   });
   return codes;
@@ -157,11 +157,11 @@ export async function createRecoveryCodesForAdmin(adminId: string): Promise<stri
  * same code can't both succeed.
  */
 export async function consumeRecoveryCode(
-  adminId: string,
+  userId: string,
   submitted: string
 ): Promise<boolean> {
   const unused = await prisma.adminRecoveryCode.findMany({
-    where: { adminId, usedAt: null },
+    where: { userId, usedAt: null },
   });
   for (const row of unused) {
     if (await verifyRecoveryCode(submitted, row.codeHash)) {

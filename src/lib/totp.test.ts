@@ -121,40 +121,40 @@ describe("recovery codes: generation & hashing", () => {
 });
 
 describe("recovery codes: single-use against the database", () => {
-  let adminId: string;
+  let userId: string;
 
   beforeEach(async () => {
-    const admin = await prisma.adminUser.create({
+    const user = await prisma.user.create({
       data: {
         email: `totp-test-${crypto.randomUUID()}@example.com`,
         passwordHash: "unused-in-this-test",
       },
     });
-    adminId = admin.id;
+    userId = user.id;
   });
 
   afterEach(async () => {
-    await prisma.adminUser.delete({ where: { id: adminId } }).catch(() => {});
+    await prisma.user.delete({ where: { id: userId } }).catch(() => {});
   });
 
   it("a freshly created code works exactly once", async () => {
-    const codes = await createRecoveryCodesForAdmin(adminId);
+    const codes = await createRecoveryCodesForAdmin(userId);
     expect(codes).toHaveLength(10);
 
     const [code] = codes;
-    expect(await consumeRecoveryCode(adminId, code!)).toBe(true);
-    expect(await consumeRecoveryCode(adminId, code!)).toBe(false);
+    expect(await consumeRecoveryCode(userId, code!)).toBe(true);
+    expect(await consumeRecoveryCode(userId, code!)).toBe(false);
   });
 
   it("an unknown code is rejected", async () => {
-    await createRecoveryCodesForAdmin(adminId);
-    expect(await consumeRecoveryCode(adminId, "ZZZZ-ZZZZ")).toBe(false);
+    await createRecoveryCodesForAdmin(userId);
+    expect(await consumeRecoveryCode(userId, "ZZZZ-ZZZZ")).toBe(false);
   });
 
   it("other codes in the set remain usable after one is spent", async () => {
-    const codes = await createRecoveryCodesForAdmin(adminId);
-    expect(await consumeRecoveryCode(adminId, codes[0]!)).toBe(true);
-    expect(await consumeRecoveryCode(adminId, codes[1]!)).toBe(true);
-    expect(await consumeRecoveryCode(adminId, codes[0]!)).toBe(false);
+    const codes = await createRecoveryCodesForAdmin(userId);
+    expect(await consumeRecoveryCode(userId, codes[0]!)).toBe(true);
+    expect(await consumeRecoveryCode(userId, codes[1]!)).toBe(true);
+    expect(await consumeRecoveryCode(userId, codes[0]!)).toBe(false);
   });
 });

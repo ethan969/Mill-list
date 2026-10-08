@@ -9,7 +9,7 @@ import { decryptTotpSecret, verifyAndConsumeTotp, consumeRecoveryCode } from "@/
 import { checkRateLimit, recordAttempt } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/leads";
 
-// Second step of login for an admin already enrolled in 2FA: a TOTP code,
+// Second step of login for a user already enrolled in 2FA: a TOTP code,
 // or a recovery code if they've lost access to their authenticator.
 export async function POST(request: NextRequest) {
   const pending = await getPendingTwoFactorSession();
@@ -34,20 +34,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Enter a code." }, { status: 400 });
   }
 
-  const admin = await prisma.adminUser.findUnique({ where: { id: pending.sub } });
-  if (!admin || !admin.totpEnabledAt || !admin.totpSecretEncrypted) {
+  const user = await prisma.user.findUnique({ where: { id: pending.sub } });
+  if (!user || !user.totpEnabledAt || !user.totpSecretEncrypted) {
     return NextResponse.json({ error: "2FA isn't set up for this account." }, { status: 400 });
   }
 
   let ok = false;
   if (recoveryCode) {
-    ok = await consumeRecoveryCode(admin.id, recoveryCode);
+    ok = await consumeRecoveryCode(user.id, recoveryCode);
   } else {
-    const secret = decryptTotpSecret(admin.totpSecretEncrypted);
-    const result = verifyAndConsumeTotp(secret, code, admin.totpLastUsedStep);
+    const secret = decryptTotpSecret(user.totpSecretEncrypted);
+    const result = verifyAndConsumeTotp(secret, code, user.totpLastUsedStep);
     if (result.valid) {
-      await prisma.adminUser.update({
-        where: { id: admin.id },
+      await prisma.user.update({
+        where: { id: user.id },
         data: { totpLastUsedStep: result.step },
       });
       ok = true;
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   }
 
   await destroyPendingTwoFactorSession();
-  await createAdminSession(admin.id, admin.email);
+  await createAdminSession(user.id, user.email);
 
   return NextResponse.json({ ok: true });
 }

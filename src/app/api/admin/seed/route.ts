@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
+import { TOKEN_PRODUCTIONS_COMPANY_ID } from "@/lib/tenancy";
 
 // One-time (and re-runnable) bootstrap for the admin account, triggered by
 // visiting a URL rather than needing a terminal. Gated by SESSION_SECRET so
@@ -28,6 +29,16 @@ function tokenMatches(token: string, secret: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  // This route has no session check of its own (src/proxy.ts deliberately
+  // exempts it — it's the bootstrap mechanism, meant to work before any
+  // admin session exists) and is gated only by a token compared against
+  // SESSION_SECRET. That's an acceptable bootstrap story for a fresh
+  // deploy, but not for a production environment that already has real
+  // admin accounts and real company data — disabled there outright.
+  if (process.env.NODE_ENV === "production") {
+    return new NextResponse("Not found.", { status: 404 });
+  }
+
   const token = request.nextUrl.searchParams.get("token") ?? "";
   const secret = process.env.SESSION_SECRET ?? "";
 
@@ -53,10 +64,24 @@ export async function GET(request: NextRequest) {
   }
 
   const passwordHash = await hashPassword(password);
-  await prisma.adminUser.upsert({
+  const user = await prisma.user.upsert({
     where: { email },
     update: { passwordHash, name },
     create: { email, passwordHash, name },
+  });
+
+  // Every user needs a CompanyMembership to access any tenant data (see
+  // src/lib/tenant-context.ts) — this bootstrap route's seeded account is
+  // tied to Token Productions as its Owner, same as prisma/seed-admin.ts.
+  await prisma.company.upsert({
+    where: { id: TOKEN_PRODUCTIONS_COMPANY_ID },
+    update: {},
+    create: { id: TOKEN_PRODUCTIONS_COMPANY_ID, name: "Token Productions" },
+  });
+  await prisma.companyMembership.upsert({
+    where: { userId_companyId: { userId: user.id, companyId: TOKEN_PRODUCTIONS_COMPANY_ID } },
+    update: {},
+    create: { userId: user.id, companyId: TOKEN_PRODUCTIONS_COMPANY_ID, role: "OWNER" },
   });
 
   return html(
