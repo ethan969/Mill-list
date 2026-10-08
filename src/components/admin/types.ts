@@ -25,6 +25,19 @@ export type AdminReferenceLink = {
 
 export type TeamMember = { name: string; role?: string; bio?: string };
 
+export type AdminFinanceSource = {
+  id: string;
+  name: string;
+  type: string;
+  /** Minor units (plain number — see src/lib/money.ts's bigIntMinorToNumber). */
+  amount: number;
+  status: string;
+  recoups: boolean;
+  recoupmentPosition: number | null;
+  recoupmentPremiumBps: number | null;
+  order: number;
+};
+
 export type AdminSlateMember = {
   projectId: string;
   order: number;
@@ -47,6 +60,10 @@ export type AdminSlate = {
   fontId: string | null;
   isPublished: boolean;
   projects: AdminSlateMember[];
+  recoupmentStructure: string | null;
+  recoupmentNote: string | null;
+  disclaimerText: string | null;
+  financeDisplayCurrency: string;
 };
 
 export type AdminProject = {
@@ -72,4 +89,20 @@ export type AdminProject = {
   gallery: AdminGalleryItem[];
   references: AdminReferenceLink[];
   _count: { downloads: number };
+  currency: string | null;
+  /** Minor units (plain number), or null if unset — see src/lib/money.ts. */
+  grossBudget: number | null;
+  equitySought: number | null;
+  minimumTicket: number | null;
+  financeUpdatedAt: string | null;
+  financeSources: AdminFinanceSource[];
+};
+
+export type AdminFxRate = {
+  id: string;
+  from: string;
+  to: string;
+  /** Prisma.Decimal serializes to a plain decimal string over JSON. */
+  rate: string;
+  asOfDate: string;
 };

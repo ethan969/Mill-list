@@ -10,10 +10,12 @@ import DocumentsPanel from "@/components/admin/DocumentsPanel";
 import AboutPanel from "@/components/admin/AboutPanel";
 import GalleryPanel from "@/components/admin/GalleryPanel";
 import LeadsPanel from "@/components/admin/LeadsPanel";
+import FinancePanel from "@/components/admin/FinancePanel";
 
 const TABS = [
   { key: "details", label: "Details" },
   ...DOCUMENT_SECTIONS.map((s) => ({ key: s.slug, label: s.label })),
+  { key: "finance", label: "Finance" },
   { key: "about", label: "About Us" },
   { key: "gallery", label: "Gallery & References" },
   { key: "leads", label: "Leads" },
@@ -102,6 +104,9 @@ export default function ProjectEditClient({
             section={section}
             onUpdate={onUpdate}
           />
+        )}
+        {tab === "finance" && (
+          <FinancePanel project={project} onUpdate={onUpdate} />
         )}
         {tab === "about" && <AboutPanel project={project} onUpdate={onUpdate} />}
         {tab === "gallery" && (

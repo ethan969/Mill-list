@@ -49,6 +49,16 @@ export default function AdminHeader() {
             >
               Slates
             </Link>
+            <Link
+              href="/admin/fx-rates"
+              className={
+                pathname.startsWith("/admin/fx-rates")
+                  ? "text-accent"
+                  : "text-muted hover:text-accent transition-colors"
+              }
+            >
+              FX Rates
+            </Link>
           </nav>
         </div>
         <button
