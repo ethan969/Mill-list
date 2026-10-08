@@ -81,20 +81,22 @@ export default async function SlateLandingPage({
   // finance-related in this page's output (including the RSC payload) for
   // an unauthenticated request, matching the no-film-titles-either
   // discipline the rest of this page already follows for `films` below.
+  const slateProjects = slate.projects.filter((sp) => sp.project !== null);
+
   const finance = authenticated
-    ? await loadSlateFinance(slate, slate.projects.map((sp) => sp.project.id))
+    ? await loadSlateFinance(slate, slateProjects.map((sp) => sp.project!.id))
     : null;
 
   // Every slate member appears here, published or not: a film's slate page
   // (src/app/slate/[slug]/[projectSlug]) is access-controlled entirely
   // through slate membership, independent of the project's own
   // draft/published state.
-  const films: SlateFilm[] = slate.projects.map((sp) => ({
-    slug: sp.project.slug,
-    title: sp.project.title,
-    productionCompany: sp.project.productionCompany,
-    tagline: sp.project.tagline,
-    hasPoster: Boolean(sp.project.posterKey),
+  const films: SlateFilm[] = slateProjects.map((sp) => ({
+    slug: sp.project!.slug,
+    title: sp.project!.title,
+    productionCompany: sp.project!.productionCompany,
+    tagline: sp.project!.tagline,
+    hasPoster: Boolean(sp.project!.posterKey),
   }));
 
   return (

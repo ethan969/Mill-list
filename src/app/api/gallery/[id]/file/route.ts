@@ -21,7 +21,7 @@ export async function GET(
     },
   });
 
-  if (!item) {
+  if (!item || !item.project) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
