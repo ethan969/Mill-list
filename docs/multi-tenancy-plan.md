@@ -1,6 +1,6 @@
 # Multi-tenancy migration plan
 
-**Status:** Commits 1–4 (schema, backfill, User/CompanyMembership, tenant-db) built and pushed on branch `multi-tenancy`. Route migration (commit 5+) not started.
+**Status:** Commits 1–2 (schema, backfill) built on branch `multi-tenancy`. Commits 3–4 (User/CompanyMembership, tenant-db) in progress. Route migration (commit 5+) not started.
 
 ## Context
 
@@ -104,7 +104,11 @@ Additive, expand-and-contract, idempotent at every data step (revision 7).
    UPDATE "FxRate" SET "companyId" = '<fixed-cuid>' WHERE "companyId" IS NULL;
    UPDATE "DocumentDownload" SET "companyId" = '<fixed-cuid>' WHERE "companyId" IS NULL;
    ```
-   Every write is `WHERE ... IS NULL` — safe to run multiple times, including **immediately before Migration C** (the `NOT NULL` cutover, a future commit) to sweep up anything created between the first backfill and the cutover.
+   Every write is `WHERE ... IS NULL` — safe to run multiple times, including **immediately before Migration C** (the `NOT NULL` cutover, a future commit) to sweep up anything created between the first backfill and the cutover. Confirmed idempotent empirically: re-running the SQL directly after it had already applied produced `UPDATE 0` on every statement and `INSERT 0 0`, with row counts unchanged.
+
+   **A real bug found and fixed while verifying this step, not just a theoretical risk:** Postgres's composite-FK `MATCH SIMPLE` semantics (relied on in §1 to let a mixed-nullability relation validate at all) have a second-order consequence nothing in the original design accounted for — Prisma's generated SQL for resolving a composite relation (`include: { project: true }` on a `GalleryItem`, say) joins on `projectId = projectId AND companyId = companyId`, and SQL's `NULL = NULL` is never true. Confirmed empirically: before this backfill ran, `prisma.galleryItem.findFirst({ include: { project: true } })` returned `project: null` despite `projectId` matching a real row exactly — the relation silently failed to resolve, purely because both sides' `companyId` were `NULL`. This means Migration A **alone was not actually the zero-behavior-change step it was designed to be** — every relation `include` across every composite-FK model breaks the moment the composite FK exists and `companyId` is still null, which is true for 100% of rows until this backfill runs.
+
+   Migration B therefore also sets a DB-level `DEFAULT` of the Token Productions id on every one of these `companyId` columns (not just backfilling existing rows), so that any row inserted by a still-unmigrated admin route (which doesn't set `companyId` at all) gets a real, matching value automatically rather than `NULL` — keeping relation resolution correct for the whole window between this pass and the eventual route migration (§4/§7). This default is deliberately **not** mirrored into `schema.prisma`'s `@default()` (hardcoding one company's id into a multi-tenant model's own schema would be wrong), so it only exists at the database level and is dead weight, safe to drop, once every route supplies `companyId` itself. **Practical implication for the production rollout:** Migrations A and B should be deployed together, back-to-back, not left with a production traffic window in between — A alone is not safe to run standalone for any real length of time, which revises the "fully backward-compatible, deploy and verify in isolation" framing above.
 
 3. **Verification gate — Neon branch (honesty note on this pass):** the plan calls for creating a Neon branch from production data, running A+B there, and verifying before touching production. **This sandbox has no Neon API access** (no `NEON_API_KEY`/project credentials in this environment) — Migrations A and B in this pass were written and verified against the local Postgres instance used throughout this session (same data shape, same migration SQL that will run anywhere), not a real Neon branch. The Neon-branch step is still the right verification gate for the actual production rollout and is **not satisfied** by this pass — flagged clearly in §7 as an open item before these migrations touch real company data.
 
