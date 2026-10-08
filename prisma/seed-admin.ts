@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { TOKEN_PRODUCTIONS_COMPANY_ID } from "../src/lib/tenancy";
 
 const prisma = new PrismaClient();
 
@@ -19,13 +20,27 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const admin = await prisma.adminUser.upsert({
+  const user = await prisma.user.upsert({
     where: { email: email.toLowerCase() },
     update: { passwordHash, name },
     create: { email: email.toLowerCase(), passwordHash, name },
   });
 
-  console.log(`Admin user ready: ${admin.email}`);
+  // Every user needs a CompanyMembership to access any tenant data (see
+  // src/lib/tenant-context.ts) — this script's seeded account is tied to
+  // Token Productions as its Owner.
+  const company = await prisma.company.upsert({
+    where: { id: TOKEN_PRODUCTIONS_COMPANY_ID },
+    update: {},
+    create: { id: TOKEN_PRODUCTIONS_COMPANY_ID, name: "Token Productions" },
+  });
+  await prisma.companyMembership.upsert({
+    where: { userId_companyId: { userId: user.id, companyId: company.id } },
+    update: {},
+    create: { userId: user.id, companyId: company.id, role: "OWNER" },
+  });
+
+  console.log(`Admin user ready: ${user.email} (Owner of ${company.name})`);
 }
 
 main()

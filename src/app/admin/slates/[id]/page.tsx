@@ -36,11 +36,13 @@ export default async function SlateEditPage({
     accentColor: slate.accentColor,
     fontId: slate.fontId,
     isPublished: slate.isPublished,
-    projects: slate.projects.map((sp) => ({
-      projectId: sp.projectId,
-      order: sp.order,
-      project: sp.project,
-    })),
+    projects: slate.projects
+      .filter((sp) => sp.project !== null)
+      .map((sp) => ({
+        projectId: sp.projectId,
+        order: sp.order,
+        project: sp.project!,
+      })),
     recoupmentStructure: slate.recoupmentStructure,
     recoupmentNote: slate.recoupmentNote,
     disclaimerText: slate.disclaimerText,

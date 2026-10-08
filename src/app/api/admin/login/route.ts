@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const admin = await prisma.adminUser.findUnique({ where: { email } });
-  if (!admin) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
     await recordAttempt(rateKey);
     return NextResponse.json(
       { error: "Incorrect email or password." },
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const valid = await verifyPassword(password, admin.passwordHash);
+  const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
     await recordAttempt(rateKey);
     return NextResponse.json(
@@ -56,10 +56,10 @@ export async function POST(request: NextRequest) {
   // a pending session proves it without creating a real one, and the
   // client is told whether to go set up 2FA for the first time or enter
   // a code from an already-enrolled authenticator.
-  await createPendingTwoFactorSession(admin.id, admin.email);
+  await createPendingTwoFactorSession(user.id, user.email);
 
   return NextResponse.json({
     ok: true,
-    next: admin.totpEnabledAt ? "verify" : "setup",
+    next: user.totpEnabledAt ? "verify" : "setup",
   });
 }

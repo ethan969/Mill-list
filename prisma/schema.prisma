@@ -7,7 +7,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model AdminUser {
+/// A production company — the tenancy root. The platform is multi-tenant:
+/// every Project/Slate (and everything hanging off them) belongs to
+/// exactly one Company, and admin access is always scoped through a
+/// CompanyMembership, never global. See docs/multi-tenancy-plan.md for
+/// the full migration this model is part of, and src/lib/tenant-db.ts for
+/// how every tenant-model query gets companyId injected automatically.
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  /// Reserved for a future per-company surface (e.g. a subdomain or
+  /// portal path); not read anywhere yet.
+  slug      String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships CompanyMembership[]
+  projects    Project[]
+  slates      Slate[]
+  fxRates     FxRate[]
+  auditLogs   AuditLog[]
+
+  // onDelete: Restrict on every relation below (and on CompanyMembership/
+  // AuditLog) is deliberate — a Company can't be deleted while it still
+  // owns anything. Accidental mass-deletion (a bad script, a careless
+  // test helper) has to tear down every child explicitly first.
+}
+
+/// A platform login identity — one person, one row, regardless of how
+/// many companies they belong to (see CompanyMembership). Was named
+/// AdminUser before multi-tenancy; renamed rather than recreated so
+/// existing admin_session JWTs (whose `sub` claim is this row's id) and
+/// existing 2FA enrollment keep working unchanged across the migration.
+model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
@@ -18,26 +50,84 @@ model AdminUser {
   /// see src/lib/totp.ts. Set as soon as enrollment starts; totpEnabledAt
   /// is what actually gates whether 2FA is required at login.
   totpSecretEncrypted String?
-  /// Null until the admin confirms enrollment with a valid code.
+  /// Null until the user confirms enrollment with a valid code.
   totpEnabledAt       DateTime?
   /// The most recent TOTP time-step successfully consumed, so a code
   /// can't be replayed within its own validity window.
   totpLastUsedStep    Int?
 
+  /// Mill List's own operators, not company staff — lets a platform admin
+  /// act on any company without a CompanyMembership row for each one, via
+  /// the explicit, audited bypass in src/lib/tenant-context.ts's
+  /// resolveCompanyId. Not settable through any admin UI; seeded directly.
+  isPlatformAdmin Boolean @default(false)
+
   recoveryCodes AdminRecoveryCode[]
+  memberships   CompanyMembership[]
+  auditLogs     AuditLog[]
 }
 
 /// Single-use 2FA recovery codes, bcrypt-hashed (never stored in plaintext,
 /// so seeing this table doesn't reveal usable codes — see src/lib/totp.ts).
 model AdminRecoveryCode {
   id        String    @id @default(cuid())
-  adminId   String
-  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   codeHash  String
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
-  @@index([adminId])
+  @@index([userId])
+}
+
+enum CompanyRole {
+  OWNER
+  EDITOR
+}
+
+/// Which Users belong to which Company, and with what role. Many-to-many
+/// by design (a person could belong to more than one company) even though
+/// the beta only needs one company per user — see
+/// src/lib/tenant-context.ts's resolveCompanyId for how this is resolved
+/// per request (never cached in the session JWT; always a fresh lookup,
+/// same "never trust a cached authorization decision" discipline this
+/// codebase already uses for room/slate sessionVersion checks).
+model CompanyMembership {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  role      CompanyRole
+  createdAt DateTime    @default(now())
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+  @@index([userId])
+}
+
+/// Minimal, narrow-purpose audit trail — not a general-purpose logging
+/// system. Added specifically because the platform-admin cross-company
+/// bypass (src/lib/tenant-context.ts) needs a trail from the moment it
+/// exists, not bolted on after the fact; every other write path is
+/// expected to stay within its own company by construction (the composite
+/// foreign keys below) rather than needing to be logged to prove it.
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// e.g. "platform_admin_bypass". Free text deliberately, rather than an
+  /// enum — this table is expected to grow new action kinds without a
+  /// schema migration for each one.
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([action])
 }
 
 enum DocumentSection {
@@ -82,6 +172,14 @@ enum RecoupmentStructure {
 
 model Project {
   id                String    @id @default(cuid())
+  /// Nullable for now — backfilled by prisma/migrations/.../add_multi_tenancy_backfill,
+  /// flipped NOT NULL by a later migration once every admin route is on
+  /// the tenant-scoped client (see docs/multi-tenancy-plan.md Migration C).
+  companyId         String?
+  company           Company?  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  /// Stays globally unique, deliberately not scoped per company — it's the
+  /// literal public URL path (/<slug>, no company segment), so two
+  /// companies colliding on a slug would collide on a URL.
   slug              String    @unique
   title             String
   productionCompany String
@@ -137,7 +235,9 @@ model Project {
   slates         SlateProject[]
   financeSources FinanceSource[]
 
+  @@unique([id, companyId]) // composite-FK target for every child below
   @@index([slug])
+  @@index([companyId])
 }
 
 /// One line item in a film's capital stack — see src/lib/finance.ts for
@@ -148,7 +248,13 @@ model Project {
 model FinanceSource {
   id                   String              @id @default(cuid())
   projectId            String
-  project              Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Nullable for now — see Project.companyId.
+  companyId            String?
+  /// Composite FK to Project(id, companyId) — not just (id) — so a row
+  /// whose companyId doesn't match its own project's companyId is
+  /// physically unrepresentable, not merely unqueried. Same pattern on
+  /// every other project/slate-owned model below.
+  project              Project?            @relation(fields: [projectId, companyId], references: [id, companyId], onDelete: Cascade)
   name                 String
   type                 FinanceSourceType
   /// Minor units, same convention as Project.grossBudget.
@@ -172,6 +278,7 @@ model FinanceSource {
   updatedAt            DateTime            @updatedAt
 
   @@index([projectId])
+  @@index([companyId])
 }
 
 /// A curated, password-protected collection of existing Projects, browsable
@@ -184,6 +291,11 @@ model FinanceSource {
 /// duplicating each project's own password.
 model Slate {
   id                     String               @id @default(cuid())
+  /// Nullable for now — see Project.companyId.
+  companyId              String?
+  company                Company?             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  /// Stays globally unique, same reasoning as Project.slug — the literal
+  /// public URL path, no company segment.
   slug                   String               @unique
   title                  String
   /// Short teaser shown even before the password gate is passed (like a
@@ -230,7 +342,9 @@ model Slate {
   documents Document[]
   downloads DocumentDownload[]
 
+  @@unique([id, companyId]) // composite-FK target for every child below
   @@index([slug])
+  @@index([companyId])
 }
 
 /// A single exchange rate snapshot, multiplying 1 unit of `from` into
@@ -239,17 +353,27 @@ model Slate {
 /// always looks up the most recent row for a given (from, to) pair rather
 /// than assuming there's only ever one. See that file for why a missing
 /// rate is a reported error state, never a guessed/defaulted conversion.
+///
+/// Per-company, not shared platform-wide — each company's finance team
+/// enters and sees only its own rates. A real behavior change from the
+/// pre-multi-tenancy version of this table (which had no owner at all):
+/// company B no longer benefits from a rate company A already entered for
+/// the same currency pair/date.
 model FxRate {
-  id       String   @id @default(cuid())
-  from     Currency
-  to       Currency
+  id        String   @id @default(cuid())
+  /// Nullable for now — see Project.companyId. FxRate had no owner at all
+  /// before this migration, so every existing row starts here too.
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  from      Currency
+  to        Currency
   /// An exact decimal (backed by Prisma.Decimal / decimal.js →  Postgres
   /// NUMERIC), not a float — this multiplies integer minor-unit money
   /// amounts, and a binary float rate couldn't guarantee that stays exact.
-  rate     Decimal  @db.Decimal(18, 8)
-  asOfDate DateTime
+  rate      Decimal  @db.Decimal(18, 8)
+  asOfDate  DateTime
 
-  @@index([from, to, asOfDate])
+  @@index([companyId, from, to, asOfDate])
 }
 
 /// Which Projects a Slate currently includes, and in what order to list
@@ -257,18 +381,27 @@ model FxRate {
 /// (src/lib/access.ts), not baked into the slate session token, so
 /// removing a film from a slate takes effect immediately for anyone
 /// already holding a valid slate cookie.
+///
+/// Carries its own companyId, with a composite FK to *both* Slate and
+/// Project on (parentId, companyId). Since this row has only one
+/// companyId value, both FKs can only be satisfied simultaneously when
+/// slate.companyId === project.companyId — the database makes "a slate
+/// including another company's film" unrepresentable, not just unqueried.
 model SlateProject {
   id        String   @id @default(cuid())
   slateId   String
-  slate     Slate    @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  /// Nullable for now — see Project.companyId.
+  companyId String?
+  slate     Slate?   @relation(fields: [slateId, companyId], references: [id, companyId], onDelete: Cascade)
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project? @relation(fields: [projectId, companyId], references: [id, companyId], onDelete: Cascade)
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
   @@unique([slateId, projectId])
   @@index([slateId])
   @@index([projectId])
+  @@index([companyId])
 }
 
 /// A document belongs to exactly one of a Project (its room) or a Slate
@@ -276,12 +409,20 @@ model SlateProject {
 /// enforced by a database CHECK constraint added by this model's migration
 /// (Prisma's schema DSL doesn't express arbitrary CHECK constraints, so
 /// it's appended as raw SQL there) rather than by application code alone.
+///
+/// companyId is required (unlike projectId/slateId) and carries composite
+/// FKs to both possible parents — Postgres's default MATCH SIMPLE means a
+/// composite FK with a null column (projectId or slateId, whichever this
+/// row doesn't use) is simply not checked, so the XOR CHECK constraint and
+/// these composite FKs compose correctly together.
 model Document {
   id         String          @id @default(cuid())
+  /// Nullable for now — see Project.companyId.
+  companyId  String?
   projectId  String?
-  project    Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    Project?        @relation(fields: [projectId, companyId], references: [id, companyId], onDelete: Cascade)
   slateId    String?
-  slate      Slate?          @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  slate      Slate?          @relation(fields: [slateId, companyId], references: [id, companyId], onDelete: Cascade)
   section    DocumentSection
   title      String
   fileKey    String
@@ -297,14 +438,18 @@ model Document {
 
   downloads DocumentDownload[]
 
+  @@unique([id, companyId]) // composite-FK target for DocumentDownload.document below
   @@index([projectId, section])
   @@index([slateId, section])
+  @@index([companyId])
 }
 
 model GalleryItem {
   id        String          @id @default(cuid())
   projectId String
-  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Nullable for now — see Project.companyId.
+  companyId String?
+  project   Project?        @relation(fields: [projectId, companyId], references: [id, companyId], onDelete: Cascade)
   type      GalleryItemType
   fileKey   String
   fileName  String          @default("file")
@@ -314,18 +459,22 @@ model GalleryItem {
   createdAt DateTime        @default(now())
 
   @@index([projectId])
+  @@index([companyId])
 }
 
 model ReferenceLink {
   id        String   @id @default(cuid())
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Nullable for now — see Project.companyId.
+  companyId String?
+  project   Project? @relation(fields: [projectId, companyId], references: [id, companyId], onDelete: Cascade)
   label     String
   url       String
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
   @@index([projectId])
+  @@index([companyId])
 }
 
 /// Recorded each time someone provides their email to receive a
@@ -336,24 +485,35 @@ model ReferenceLink {
 /// document via a slate session records both (which project's document,
 /// and which slate the access came through), while downloading a
 /// slate-level document records only slateId.
+///
+/// This is the closest thing to a "viewer"/"investor list" entity in the
+/// app today — there is no separate Viewer/Lead model (see
+/// docs/multi-tenancy-plan.md). No uniqueness constraint exists on email
+/// here, and none is added by this migration; if a real Viewer identity
+/// is ever built, its uniqueness must be scoped @@unique([companyId,
+/// email]), never global — the same person can legitimately be a
+/// prospective investor for two unrelated companies on this platform.
 model DocumentDownload {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
+  /// Nullable for now — see Project.companyId.
+  companyId  String?
   projectId  String?
-  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    Project?  @relation(fields: [projectId, companyId], references: [id, companyId], onDelete: Cascade)
   slateId    String?
-  slate      Slate?   @relation(fields: [slateId], references: [id], onDelete: Cascade)
+  slate      Slate?    @relation(fields: [slateId, companyId], references: [id, companyId], onDelete: Cascade)
   documentId String
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   Document? @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Cascade)
   email      String
-  emailSent  Boolean  @default(false)
-  linkOpened Boolean  @default(false)
+  emailSent  Boolean   @default(false)
+  linkOpened Boolean   @default(false)
   ip         String?
   userAgent  String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([projectId])
   @@index([slateId])
   @@index([email])
+  @@index([companyId])
 }
 
 /// Backs the per-key rate limiter (src/lib/rate-limit.ts) — a fixed window
@@ -365,6 +525,11 @@ model DocumentDownload {
 /// every already-expired row with small probability on each call
 /// (sweepExpiredAttempts) so the table doesn't grow unboundedly from keys
 /// that are never explicitly cleared — no separate cron job/route needed.
+///
+/// Deliberately NOT company-scoped — see docs/multi-tenancy-plan.md §1.
+/// Its key is a free-form string with no real FK, and its purpose (abuse
+/// prevention) would be defeated by letting an attacker reset their
+/// budget by "switching companies."
 model RateLimitAttempt {
   key     String   @id
   count   Int      @default(0)
