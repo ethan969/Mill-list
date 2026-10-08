@@ -1,6 +1,6 @@
 # Multi-tenancy migration plan
 
-**Status:** Commits 1–2 (schema, backfill) built on branch `multi-tenancy`. Commits 3–4 (User/CompanyMembership, tenant-db) in progress. Route migration (commit 5+) not started.
+**Status:** Commits 1–4 (schema, backfill, User/CompanyMembership, tenant-db) built and pushed on branch `multi-tenancy`. `npx tsc --noEmit`, `npx eslint .`, and the full `npx vitest run` suite (137 tests, including a real `next build` and 27 new tenant-scoping tests) all pass clean on this branch. Route migration (commit 5+) not started — see §7 for the batch order. The Neon-branch verification gate in §2 is **not satisfied** by this pass (no Neon API access in this environment); everything here was verified against a local Postgres instance only.
 
 ## Context
 
